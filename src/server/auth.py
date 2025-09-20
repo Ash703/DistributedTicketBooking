@@ -3,40 +3,88 @@ import bcrypt
 import secrets
 import time
 
-DB_PATH = "train_booking.db"
+DB_NAME = "TicketBooking.db"
 
 # Database Initialization
 def get_db():
     """Connect to SQLite database."""
-    return sqlite3.connect(DB_PATH)
+    return sqlite3.connect(DB_NAME)
+
+def get_db_connection():
+    """Establishes a connection to the database, enabling foreign key support."""
+    conn = get_db()
+    conn.execute("PRAGMA foreign_keys = ON") 
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_db():
     """Initialize users and sessions tables."""
-    conn = get_db()
-    cur = conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    # Users table
-    cur.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    # 1. Users Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Users (
+        user_id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
-        password_hash BLOB NOT NULL
+        hashed_password TEXT NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('ADMIN', 'CUSTOMER'))
     )
-    ''')
+    """)
 
-    # Sessions table
-    cur.execute('''
-    CREATE TABLE IF NOT EXISTS sessions (
-        token TEXT PRIMARY KEY,
-        user_id INTEGER,
-        created_at REAL,
-        FOREIGN KEY(user_id) REFERENCES users(id)
+    # 2. Session Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL, -- The new column for the expiry timestamp
+    FOREIGN KEY(user_id) REFERENCES Users(user_id) ON DELETE CASCADE
     )
-    ''')
+    """)
+
+    # 3. Train Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Trains (
+    train_number INTEGER PRIMARY KEY,
+    train_name TEXT NOT NULL,
+    source TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    train_type TEXT
+    )
+    """)
+
+    # 4. TrainService Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS TrainServices (
+    service_id TEXT PRIMARY KEY,
+    train_number INTEGER NOT NULL,
+    datetime_of_departure TEXT NOT NULL,
+    datetime_of_arrival TEXT NOT NULL,
+    seat_type TEXT NOT NULL CHECK(seat_type IN ('AC1', 'AC2', 'AC3', 'GENERAL')),
+    seats_available INTEGER NOT NULL,
+    price REAL NOT NULL,
+    FOREIGN KEY(train_number) REFERENCES Trains(train_number) ON DELETE CASCADE
+    )
+    """)
+
+    # 5. Booking Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Bookings (
+    booking_id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    service_id TEXT NOT NULL,
+    number_of_seats INTEGER NOT NULL,
+    total_cost REAL NOT NULL,
+    booking_timestamp REAL NOT NULL DEFAULT (strftime('%s', 'now')),
+    FOREIGN KEY(user_id) REFERENCES Users(user_id),
+    FOREIGN KEY(service_id) REFERENCES TrainServices(service_id)
+    )
+    """)
 
     conn.commit()
     conn.close()
-    print("Database initialized successfully.")
+    print("\nDatabase initialized successfully.")
 
 # Password Utilities
 def hash_password(password: str) -> bytes:
