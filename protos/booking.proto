@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package booking;
+
+// The main service for our ticketing system.
+service Ticketing {
+  // Handles login for both Admins and Customers.
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // An Admin-only function to add a new travel service.
+  rpc AddTravelService(AddServiceRequest) returns (StatusResponse);
+
+  // A Customer function to view all available services for a given date.
+  rpc ListAvailableServices(ListServicesRequest) returns (ListServicesResponse);
+
+  // A Customer function to book one or more seats on a service.
+  rpc BookSeats(BookSeatsRequest) returns (BookingResponse);
+}
+
+// An enum to define the type of travel service.
+enum ServiceType {
+  UNSPECIFIED = 0;
+  TRAIN = 1;
+  BUS = 2;
+  FLIGHT = 3;
+}
+
+// A generic response for actions that just succeed or fail.
+message StatusResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// == Messages for Login ==
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  string message = 2;
+  string token = 3; // A token to use for future authenticated requests.
+  string role = 4;  // To identify the user as "ADMIN" or "CUSTOMER".
+}
+
+// == Messages for Admin Adding a Service ==
+message AddServiceRequest {
+  string admin_token = 1;       // Authentication for the admin.
+  ServiceType type = 2;
+  string identifier = 3;        
+  string origin = 4;
+  string destination = 5;
+  string date = 6;              // Format: "YYYY-MM-DD".
+  int32 total_seats = 7;
+}
+
+// == Messages for Customer Listing Services ==
+message ListServicesRequest {
+  string date = 1; // Customer provides a date to see available services.
+}
+
+message ServiceDetails {
+  string service_id = 1;      // A unique ID the server will generate.
+  ServiceType type = 2;
+  string identifier = 3;
+  string origin = 4;
+  string destination = 5;
+  int32 available_seats = 6;
+}
+
+message ListServicesResponse {
+  repeated ServiceDetails services = 1; // A list of all available services.
+}
+
+// == Messages for Customer Booking Seats ==
+message BookSeatsRequest {
+  string customer_token = 1;  // Authentication for the customer.
+  string service_id = 2;      // The ID of the service they want to book.
+  int32 num_seats = 3;        // Number of seats they wish to book.
+}
+
+message BookingResponse {
+  bool success = 1;
+  string message = 2;
+  string booking_id = 3;      // A unique ID for their confirmed booking.
+  repeated string seat_numbers = 4; 
+}
