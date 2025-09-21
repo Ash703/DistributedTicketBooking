@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package train_booking;
+
+// The main service for our train ticketing system.
+service Ticketing {
+  // Allows a new customer to register.
+  rpc Register(RegisterRequest) returns (StatusResponse);
+  // Authentication
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (StatusResponse);
+
+  // Admin Functions
+  rpc AddTrain(AddTrainRequest) returns (StatusResponse);
+  rpc AddTrainService(AddTrainServiceRequest) returns (StatusResponse);
+
+  // Customer Functions
+  rpc SearchTrainServices(SearchRequest) returns (SearchResponse);
+  rpc ListCities(ListCitiesRequest) returns (ListCitiesResponse);
+  rpc InitiateBooking(InitiateBookingRequest) returns (BookingConfirmation);
+  rpc ProcessPayment(ProcessPaymentRequest) returns (StatusResponse);
+  rpc GetMyBookings(GetMyBookingsRequest) returns (BookingList);
+
+}
+
+// Reusable status message for simple success/failure responses.
+message StatusResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// --- ENUMS ---
+enum SeatType {
+  UNKNOWN = 0;
+  AC1 = 1;
+  AC2 = 2;
+  AC3 = 3;
+  GENERAL = 4;
+}
+
+// --- Registration Message ---
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+}
+
+// --- Authentication Messages ---
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  string message = 2;
+  string token = 3;
+}
+
+message LogoutRequest {
+  string token = 1;
+}
+
+// --- Admin Messages ---
+message AddTrainRequest {
+  string admin_token = 1;
+  int32 train_number = 2;
+  string train_name = 3;
+  int32 source_city_id = 4;       
+  int32 destination_city_id = 5;  
+  string train_type = 6;
+}
+
+
+message SeatInfo {
+  SeatType seat_type = 1;
+  int32 seats_available = 2;
+  double price = 3;
+}
+
+message AddTrainServiceRequest {
+  string admin_token = 1;
+  int32 train_number = 2;
+  string datetime_of_departure = 3; // Format "YYYY-MM-DD HH:MM:SS"
+  string datetime_of_arrival = 4;   // Format "YYYY-MM-DD HH:MM:SS"
+  repeated SeatInfo seat_info = 5;
+}
+
+// --- Customer Messages ---
+message SearchRequest {
+  int32 source_city_id = 1;       
+  int32 destination_city_id = 2;  
+  string date = 3;
+}
+
+
+message ServiceSummary {
+  string service_id = 1;
+  int32 train_number = 2;
+  string train_name = 3;
+  string datetime_of_departure = 4;
+  string datetime_of_arrival = 5;
+  SeatType seat_type = 6;
+  int32 seats_available = 7;
+  double price = 8;
+}
+
+message SearchResponse {
+  repeated ServiceSummary services = 1;
+}
+
+message BookSeatsRequest {
+  string customer_token = 1;
+  string service_id = 2;
+  int32 number_of_seats = 3;
+}
+
+message BookingConfirmation {
+  bool success = 1;
+  string message = 2;
+  string booking_id = 3;
+  double total_cost = 4;
+}
+message InitiateBookingRequest {
+  string customer_token = 1;
+  string service_id = 2;
+  int32 number_of_seats = 3;
+}
+
+message ProcessPaymentRequest {
+    string customer_token = 1;
+    string booking_id = 2;
+    string payment_mode = 3; // e.g., "UPI", "CARD"
+}
+
+message BookingDetails {
+    string booking_id = 1;
+    string train_name = 2;
+    string source = 3;
+    string destination = 4;
+    string datetime_of_departure = 5;
+    int32 number_of_seats = 6;
+    double total_cost = 7;
+    SeatType seat_type = 8;
+}
+
+message GetMyBookingsRequest {
+    string customer_token = 1;
+}
+
+message BookingList {
+    repeated BookingDetails bookings = 1;
+}
+message City {
+    int32 city_id = 1;
+    string city_name = 2;
+    string city_code = 3;
+}
+
+message ListCitiesRequest {} 
+
+message ListCitiesResponse {
+    repeated City cities = 1;
+}

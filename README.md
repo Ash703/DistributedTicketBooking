@@ -4,3 +4,6 @@
 - Run setup.ps1
 ## Setup for Linux:
 - Run setup.sh
+
+python -m src.server.main
+python -m src.client.main
