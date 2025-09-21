@@ -2,8 +2,8 @@ from concurrent import futures
 import grpc
 import time
 import train_booking_pb2_grpc
-from .services.booking_service import BookingService
-from .database import connection as db_connection
+from services.booking_service import BookingService
+from database import connection as db_connection
 
 def serve():
     """

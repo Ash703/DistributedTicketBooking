@@ -70,9 +70,9 @@ class TicketingStub(object):
                 request_serializer=train__booking__pb2.ListCitiesRequest.SerializeToString,
                 response_deserializer=train__booking__pb2.ListCitiesResponse.FromString,
                 _registered_method=True)
-        self.InitiateBooking = channel.unary_unary(
-                '/train_booking.Ticketing/InitiateBooking',
-                request_serializer=train__booking__pb2.InitiateBookingRequest.SerializeToString,
+        self.BookSeats = channel.unary_unary(
+                '/train_booking.Ticketing/BookSeats',
+                request_serializer=train__booking__pb2.BookSeatsRequest.SerializeToString,
                 response_deserializer=train__booking__pb2.BookingConfirmation.FromString,
                 _registered_method=True)
         self.ProcessPayment = channel.unary_unary(
@@ -137,7 +137,7 @@ class TicketingServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def InitiateBooking(self, request, context):
+    def BookSeats(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -193,9 +193,9 @@ def add_TicketingServicer_to_server(servicer, server):
                     request_deserializer=train__booking__pb2.ListCitiesRequest.FromString,
                     response_serializer=train__booking__pb2.ListCitiesResponse.SerializeToString,
             ),
-            'InitiateBooking': grpc.unary_unary_rpc_method_handler(
-                    servicer.InitiateBooking,
-                    request_deserializer=train__booking__pb2.InitiateBookingRequest.FromString,
+            'BookSeats': grpc.unary_unary_rpc_method_handler(
+                    servicer.BookSeats,
+                    request_deserializer=train__booking__pb2.BookSeatsRequest.FromString,
                     response_serializer=train__booking__pb2.BookingConfirmation.SerializeToString,
             ),
             'ProcessPayment': grpc.unary_unary_rpc_method_handler(
@@ -410,7 +410,7 @@ class Ticketing(object):
             _registered_method=True)
 
     @staticmethod
-    def InitiateBooking(request,
+    def BookSeats(request,
             target,
             options=(),
             channel_credentials=None,
@@ -423,8 +423,8 @@ class Ticketing(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/train_booking.Ticketing/InitiateBooking',
-            train__booking__pb2.InitiateBookingRequest.SerializeToString,
+            '/train_booking.Ticketing/BookSeats',
+            train__booking__pb2.BookSeatsRequest.SerializeToString,
             train__booking__pb2.BookingConfirmation.FromString,
             options,
             channel_credentials,

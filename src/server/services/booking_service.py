@@ -1,8 +1,9 @@
 import time
+import grpc
 import train_booking_pb2
 import train_booking_pb2_grpc
-from ..database import models as db_models
-from ..utils import security as security_utils
+from database import models as db_models
+from utils import security as security_utils
 
 # Session duration in seconds (e.g., 24 hours)
 SESSION_DURATION_SECONDS = 24 * 60 * 60
@@ -157,5 +158,3 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             city_proto.city_name = city_row['city_name']
             city_proto.city_code = city_row['city_code']
         return response
-                              
-  
