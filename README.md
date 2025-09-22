@@ -15,3 +15,5 @@ Client:
 
 
 [Database Viewer](https://sqliteviewer.app/)
+
+Note: Run `python -m src.server.database.connection` for initalization  if required.
