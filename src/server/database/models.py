@@ -180,8 +180,8 @@ def book_seats(user_id, service_id, num_seats):
         #TODO: include status and timestamp to insert into Bookings
         booking_id = str(uuid.uuid4())
         cursor.execute("""
-            INSERT INTO Bookings (booking_id, user_id, service_id, number_of_seats, total_cost)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO Bookings (booking_id, user_id, service_id, number_of_seats, total_cost,status)
+            VALUES (?, ?, ?, ?, ?,"CONFIRMED")
         """, (booking_id, user_id, service_id, num_seats, total_cost))
 
         

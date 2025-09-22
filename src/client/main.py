@@ -24,7 +24,6 @@ def run():
 
         print("\n--- 2. Admin Adds a New Train Route ---")
         try:
-            # Note: We need the city IDs. Assuming IDs 1 (New Delhi) and 2 (Mumbai) from the seeded data.
             add_train_req = train_booking_pb2.AddTrainRequest(
                 admin_token=admin_token,
                 train_number=12951,
@@ -100,7 +99,7 @@ def run():
             if confirmation.success:
                 print(f"✅ Booking successful!")
                 print(f"   Booking ID: {confirmation.booking_id}")
-                print(f"   Total Cost: ${confirmation.total_cost:.2f}")
+                print(f"   Total Cost: ₹{confirmation.total_cost:.2f}")
             else:
                 print(f"❌ Booking failed: {confirmation.message}")
         except grpc.RpcError as e:
