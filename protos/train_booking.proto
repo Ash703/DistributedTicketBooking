@@ -2,22 +2,23 @@ syntax = "proto3";
 
 package train_booking;
 
-// The main service for our train ticketing system.
+// The main service for our ticketing system.
 service Ticketing {
-  // Allows a new customer to register.
+  // --- User Management ---
   rpc Register(RegisterRequest) returns (StatusResponse);
-  // Authentication
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc Logout(LogoutRequest) returns (StatusResponse);
 
-  // Admin Functions
+  // --- Public Information ---
+  rpc ListCities(ListCitiesRequest) returns (ListCitiesResponse);
+  rpc SearchTrainServices(SearchRequest) returns (SearchResponse);
+
+  // --- Admin Functions ---
   rpc AddTrain(AddTrainRequest) returns (StatusResponse);
   rpc AddTrainService(AddTrainServiceRequest) returns (StatusResponse);
 
-  // Customer Functions
-  rpc SearchTrainServices(SearchRequest) returns (SearchResponse);
-  rpc ListCities(ListCitiesRequest) returns (ListCitiesResponse);
-  rpc BookSeats(BookSeatsRequest) returns (BookingConfirmation);
+  // --- Customer Booking Flow ---
+  rpc InitiateBooking(InitiateBookingRequest) returns (BookingConfirmation); 
   rpc ProcessPayment(ProcessPaymentRequest) returns (StatusResponse);
   rpc GetMyBookings(GetMyBookingsRequest) returns (BookingList);
 
@@ -97,23 +98,24 @@ message ServiceSummary {
   string service_id = 1;
   int32 train_number = 2;
   string train_name = 3;
-  string datetime_of_departure = 4;
-  string datetime_of_arrival = 5;
-  SeatType seat_type = 6;
-  int32 seats_available = 7;
-  double price = 8;
+  string source_city_name = 4;
+  string destination_city_name = 5; 
+  string datetime_of_departure = 6;
+  string datetime_of_arrival = 7;
+  SeatType seat_type = 8;
+  int32 seats_available = 9;
+  double price = 10;
 }
 
 message SearchResponse {
   repeated ServiceSummary services = 1;
 }
 
-message BookSeatsRequest {
+message InitiateBookingRequest { 
   string customer_token = 1;
   string service_id = 2;
   int32 number_of_seats = 3;
 }
-
 message BookingConfirmation {
   bool success = 1;
   string message = 2;
@@ -136,6 +138,7 @@ message BookingDetails {
     int32 number_of_seats = 6;
     double total_cost = 7;
     SeatType seat_type = 8;
+    string status = 9; 
 }
 
 message GetMyBookingsRequest {

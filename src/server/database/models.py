@@ -151,46 +151,118 @@ def add_train_service(train_number, dt_departure, dt_arrival, seat_info):
         conn.close()
         
 
-def book_seats(user_id, service_id, num_seats):
+
+def initiate_booking_tx(user_id, service_id, num_seats):
     """
-    Books a specified number of seats for a service in a single transaction.
+    Reserves seats and creates a 'PENDING' booking in a single transaction.
     Returns (success, message, booking_id, total_cost).
     """
     conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        cursor = conn.cursor()
-        
-        
-        cursor.execute("BEGIN")
+
+        cursor.execute("BEGIN TRANSACTION")
 
         
         cursor.execute("SELECT seats_available, price FROM TrainServices WHERE service_id = ?", (service_id,))
         service = cursor.fetchone()
 
-        if not service or service['seats_available'] < num_seats:
+        if not service:
+            conn.rollback()
+            return False, "Service not found.", None, None
+
+        if service['seats_available'] < num_seats:
             conn.rollback()
             return False, "Not enough seats available.", None, None
 
-    
-        total_cost = service['price'] * num_seats
         
         new_seat_count = service['seats_available'] - num_seats
         cursor.execute("UPDATE TrainServices SET seats_available = ? WHERE service_id = ?", (new_seat_count, service_id))
 
-        #TODO: include status and timestamp to insert into Bookings
+        
         booking_id = str(uuid.uuid4())
+        total_cost = service['price'] * num_seats
         cursor.execute("""
-            INSERT INTO Bookings (booking_id, user_id, service_id, number_of_seats, total_cost,status)
-            VALUES (?, ?, ?, ?, ?,"CONFIRMED")
+            INSERT INTO Bookings (booking_id, user_id, service_id, number_of_seats, total_cost, status)
+            VALUES (?, ?, ?, ?, ?, 'PENDING')
         """, (booking_id, user_id, service_id, num_seats, total_cost))
 
-        
         conn.commit()
-        
-        return True, "Booking successful.", booking_id, total_cost
+        return True, "Seats successfully reserved. Awaiting payment.", booking_id, total_cost
 
     except Exception as e:
         conn.rollback()
         return False, f"An error occurred: {e}", None, None
     finally:
         conn.close()
+
+def confirm_payment_tx(booking_id, payment_mode):
+    """
+    Confirms a booking by creating a payment record and updating the booking status.
+    This should also be a transaction.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("BEGIN TRANSACTION")
+
+        cursor.execute("SELECT total_cost, status FROM Bookings WHERE booking_id = ?", (booking_id,))
+        booking = cursor.fetchone()
+
+        if not booking:
+            conn.rollback()
+            return False, "Booking ID not found."
+        
+        if booking['status'] != 'PENDING':
+            conn.rollback()
+            return False, f"Booking is already in '{booking['status']}' state."
+
+
+        payment_id = str(uuid.uuid4())
+        transaction_id = str(uuid.uuid4()) 
+        cursor.execute("""
+            INSERT INTO Payments (payment_id, booking_id, amount, payment_mode, payment_status, transaction_id)
+            VALUES (?, ?, ?, ?, 'SUCCESS', ?)
+        """, (payment_id, booking_id, booking['total_cost'], payment_mode, transaction_id))
+        
+        cursor.execute("UPDATE Bookings SET status = 'CONFIRMED' WHERE booking_id = ?", (booking_id,))
+
+        conn.commit()
+        return True, "Payment successful and booking confirmed."
+    except Exception as e:
+        conn.rollback()
+        return False, f"An error occurred during payment confirmation: {e}"
+    finally:
+        conn.close()
+
+
+def get_bookings_by_user_id(user_id):
+    """Retrieves all booking details for a given user_id."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT
+            b.booking_id,
+            b.number_of_seats,
+            b.total_cost,
+            b.status,
+            ts.datetime_of_departure,
+            ts.datetime_of_arrival,
+            ts.seat_type,
+            t.train_name,
+            source_city.city_name as source,
+            dest_city.city_name as destination
+        FROM Bookings b
+        JOIN TrainServices ts ON b.service_id = ts.service_id
+        JOIN Users u ON b.user_id = u.user_id
+        JOIN Trains t ON ts.train_number = t.train_number
+        JOIN Cities source_city ON t.source_city_id = source_city.city_id
+        JOIN Cities dest_city ON t.destination_city_id = dest_city.city_id
+        WHERE b.user_id = ?
+        ORDER BY ts.datetime_of_departure DESC
+    """, (user_id,))
+    
+    bookings = cursor.fetchall()
+    conn.close()
+    return bookings

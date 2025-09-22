@@ -2,108 +2,101 @@ import grpc
 import train_booking_pb2
 import train_booking_pb2_grpc
 
-def run():
-    # Establish a connection to the gRPC server
+def run_full_flow():
+    """Simulates the full workflow: admin setup, customer search, booking, and viewing bookings."""
     with grpc.insecure_channel('localhost:50051') as channel:
         stub = train_booking_pb2_grpc.TicketingStub(channel)
-        admin_token = ""
-        customer_token = ""
-        service_id_to_book = ""
+        print("✅ Client connected to server.")
 
-        print("--- 1. Admin Login ---")
+        # --- ADMIN FLOW ---
+        print("\n--- 1. Admin logs in and creates a service ---")
         try:
-            login_response = stub.Login(train_booking_pb2.LoginRequest(username='admin', password='admin123'))
-            if not login_response.success:
-                print(f"❌ Admin login failed: {login_response.message}")
-                return
-            admin_token = login_response.token
-            print("✅ Admin login successful.")
-        except grpc.RpcError as e:
-            print(f"❌ RPC Error during admin login: {e.details()}")
-            return
+            admin_login_res = stub.Login(train_booking_pb2.LoginRequest(username='admin', password='admin123'))
+            admin_token = admin_login_res.token
+            print("✅ Admin logged in.")
 
-        print("\n--- 2. Admin Adds a New Train Route ---")
-        try:
+            # Get City IDs to use in requests
+            list_cities_resp = stub.ListCities(train_booking_pb2.ListCitiesRequest())
+            city_map = {c.city_name: c.city_id for c in list_cities_resp.cities}
+            delhi_id = city_map.get("New Delhi")
+            mumbai_id = city_map.get("Mumbai Central")
+
+            # Add Train route
             add_train_req = train_booking_pb2.AddTrainRequest(
-                admin_token=admin_token,
-                train_number=12951,
-                train_name="Mumbai Rajdhani",
-                source_city_id=1,
-                destination_city_id=2,
-                train_type="Express"
+                admin_token=admin_token, train_number=12951, train_name="Mumbai Rajdhani",
+                source_city_id=delhi_id, destination_city_id=mumbai_id, train_type="Rajdhani"
             )
-            response = stub.AddTrain(add_train_req)
-            print(f"✅ Add Train Response: Success={response.success}, Message='{response.message}'")
-        except grpc.RpcError as e:
-            print(f"❌ RPC Error adding train: {e.details()}")
-            return
+            stub.AddTrain(add_train_req)
             
-        print("\n--- 3. Admin Adds a Specific Train Service ---")
-        try:
-            seat_info = [
-                train_booking_pb2.SeatInfo(seat_type=train_booking_pb2.AC2, seats_available=50, price=2500.0),
-                train_booking_pb2.SeatInfo(seat_type=train_booking_pb2.AC3, seats_available=100, price=1800.0)
-            ]
+            # Add a specific Service for that train
+            seat_info = [train_booking_pb2.SeatInfo(seat_type=train_booking_pb2.AC2, seats_available=50, price=3500.0)]
             add_service_req = train_booking_pb2.AddTrainServiceRequest(
-                admin_token=admin_token,
-                train_number=12951,
-                datetime_of_departure="2025-12-25 08:00:00",
-                datetime_of_arrival="2025-12-26 12:00:00",
-                seat_info=seat_info
+                admin_token=admin_token, train_number=12951,
+                datetime_of_departure="2025-12-25 17:00:00",
+                datetime_of_arrival="2025-12-26 09:00:00", seat_info=seat_info
             )
-            response = stub.AddTrainService(add_service_req)
-            print(f"✅ Add Service Response: Success={response.success}, Message='{response.message}'")
+            stub.AddTrainService(add_service_req)
+            print("✅ Admin data setup complete.")
         except grpc.RpcError as e:
-            print(f"❌ RPC Error adding service: {e.details()}")
+            print(f"❌ Admin flow failed: {e.details()}")
             return
 
-        print("\n--- 4. Customer Logs In ---")
-        try:
-            login_response = stub.Login(train_booking_pb2.LoginRequest(username='customer', password='cust123'))
-            if not login_response.success:
-                print(f"❌ Customer login failed: {login_response.message}")
-                return
-            customer_token = login_response.token
-            print(f"✅ Customer login successful.")
-        except grpc.RpcError as e:
-            print(f"❌ RPC Error during customer login: {e.details()}")
+        # --- CUSTOMER FLOW ---
+        print("\n--- 2. Customer searches for the service ---")
+        search_request = train_booking_pb2.SearchRequest(source_city_id=delhi_id, destination_city_id=mumbai_id, date="2025-12-25")
+        search_response = stub.SearchTrainServices(search_request)
+        
+        if not search_response.services:
+            print("❌ Test failed: No services found for the customer.")
             return
+        
+        service_to_book = search_response.services[0]
+        service_id_to_book = service_to_book.service_id
+        print(f"✅ Search successful. Found '{service_to_book.train_name}' with ID {service_id_to_book[:8]}...")
+        
+        print("\n--- 3. Customer logs in ---")
+        customer_login_res = stub.Login(train_booking_pb2.LoginRequest(username='customer', password='cust123'))
+        customer_token = customer_login_res.token
+        print("✅ Customer login successful.")
 
-        print("\n--- 5. Customer Searches for the Service ---")
-        try:
-            search_request = train_booking_pb2.SearchRequest(
-                source_city_id=1, # New Delhi
-                destination_city_id=2, # Mumbai
-                date="2025-12-25"
-            )
-            search_response = stub.SearchTrainServices(search_request)
-            if not search_response.services:
-                print("❌ No services found for the customer.")
-                return
-            
-            service_to_book = search_response.services[0]
-            service_id_to_book = service_to_book.service_id
-            print(f"✅ Found service: {service_to_book.train_name} (ID: {service_id_to_book[:8]}...)")
-        except grpc.RpcError as e:
-            print(f"❌ RPC Error during search: {e.details()}")
+        print("\n--- 4. Customer initiates booking (reserves seats) ---")
+        init_req = train_booking_pb2.InitiateBookingRequest(
+            customer_token=customer_token, service_id=service_id_to_book, number_of_seats=2
+        )
+        booking_confirmation = stub.InitiateBooking(init_req)
+        
+        if not booking_confirmation.success:
+            print(f"❌ Booking initiation failed: {booking_confirmation.message}")
             return
+        
+        booking_id = booking_confirmation.booking_id
+        print(f"✅ Seats reserved! Booking ID: {booking_id[:8]}..., Total Cost: {booking_confirmation.total_cost}")
 
-        print("\n--- 6. Customer Books a Seat ---")
+        print("\n--- 5. Customer processes payment ---")
+        payment_req = train_booking_pb2.ProcessPaymentRequest(
+            customer_token=customer_token, booking_id=booking_id, payment_mode="MockCreditCard"
+        )
+        payment_response = stub.ProcessPayment(payment_req)
+        
+        if not payment_response.success:
+            print(f"❌ Payment failed: {payment_response.message}")
+            return
+        print(f"✅ Payment successful! Server says: '{payment_response.message}'")
+
+        print("\n--- 6. Customer Views Their Bookings ---")
         try:
-            booking_request = train_booking_pb2.BookSeatsRequest(
-                customer_token=customer_token,
-                service_id=service_id_to_book,
-                number_of_seats=2
-            )
-            confirmation = stub.BookSeats(booking_request)
-            if confirmation.success:
-                print(f"✅ Booking successful!")
-                print(f"   Booking ID: {confirmation.booking_id}")
-                print(f"   Total Cost: ₹{confirmation.total_cost:.2f}")
-            else:
-                print(f"❌ Booking failed: {confirmation.message}")
+            my_bookings_req = train_booking_pb2.GetMyBookingsRequest(customer_token=customer_token)
+            my_bookings_resp = stub.GetMyBookings(my_bookings_req)
+
+            print(f"✅ Found {len(my_bookings_resp.bookings)} booking(s) for this user:")
+            for booking in my_bookings_resp.bookings:
+                print(f"  - Booking ID: {booking.booking_id[:8]}... | "
+                      f"Train: {booking.train_name} | "
+                      f"From: {booking.source} To: {booking.destination} | "
+                      f"Date: {booking.datetime_of_departure}")
+
         except grpc.RpcError as e:
-            print(f"❌ RPC Error during booking: {e.details()}")
+            print(f"❌ RPC Error while getting bookings: {e.details()}")
 
 if __name__ == '__main__':
-    run()
+    run_full_flow()

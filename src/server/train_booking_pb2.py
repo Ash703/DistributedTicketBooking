@@ -24,15 +24,15 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13train_booking.proto\x12\rtrain_booking\"2\n\x0eStatusResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"5\n\x0fRegisterRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\t\"2\n\x0cLoginRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\t\"@\n\rLoginResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05token\x18\x03 \x01(\t\"\x1e\n\rLogoutRequest\x12\r\n\x05token\x18\x01 \x01(\t\"\x99\x01\n\x0f\x41\x64\x64TrainRequest\x12\x13\n\x0b\x61\x64min_token\x18\x01 \x01(\t\x12\x14\n\x0ctrain_number\x18\x02 \x01(\x05\x12\x12\n\ntrain_name\x18\x03 \x01(\t\x12\x16\n\x0esource_city_id\x18\x04 \x01(\x05\x12\x1b\n\x13\x64\x65stination_city_id\x18\x05 \x01(\x05\x12\x12\n\ntrain_type\x18\x06 \x01(\t\"^\n\x08SeatInfo\x12*\n\tseat_type\x18\x01 \x01(\x0e\x32\x17.train_booking.SeatType\x12\x17\n\x0fseats_available\x18\x02 \x01(\x05\x12\r\n\x05price\x18\x03 \x01(\x01\"\xab\x01\n\x16\x41\x64\x64TrainServiceRequest\x12\x13\n\x0b\x61\x64min_token\x18\x01 \x01(\t\x12\x14\n\x0ctrain_number\x18\x02 \x01(\x05\x12\x1d\n\x15\x64\x61tetime_of_departure\x18\x03 \x01(\t\x12\x1b\n\x13\x64\x61tetime_of_arrival\x18\x04 \x01(\t\x12*\n\tseat_info\x18\x05 \x03(\x0b\x32\x17.train_booking.SeatInfo\"R\n\rSearchRequest\x12\x16\n\x0esource_city_id\x18\x01 \x01(\x05\x12\x1b\n\x13\x64\x65stination_city_id\x18\x02 \x01(\x05\x12\x0c\n\x04\x64\x61te\x18\x03 \x01(\t\"\xde\x01\n\x0eServiceSummary\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\x14\n\x0ctrain_number\x18\x02 \x01(\x05\x12\x12\n\ntrain_name\x18\x03 \x01(\t\x12\x1d\n\x15\x64\x61tetime_of_departure\x18\x04 \x01(\t\x12\x1b\n\x13\x64\x61tetime_of_arrival\x18\x05 \x01(\t\x12*\n\tseat_type\x18\x06 \x01(\x0e\x32\x17.train_booking.SeatType\x12\x17\n\x0fseats_available\x18\x07 \x01(\x05\x12\r\n\x05price\x18\x08 \x01(\x01\"A\n\x0eSearchResponse\x12/\n\x08services\x18\x01 \x03(\x0b\x32\x1d.train_booking.ServiceSummary\"W\n\x10\x42ookSeatsRequest\x12\x16\n\x0e\x63ustomer_token\x18\x01 \x01(\t\x12\x12\n\nservice_id\x18\x02 \x01(\t\x12\x17\n\x0fnumber_of_seats\x18\x03 \x01(\x05\"_\n\x13\x42ookingConfirmation\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x12\n\nbooking_id\x18\x03 \x01(\t\x12\x12\n\ntotal_cost\x18\x04 \x01(\x01\"Y\n\x15ProcessPaymentRequest\x12\x16\n\x0e\x63ustomer_token\x18\x01 \x01(\t\x12\x12\n\nbooking_id\x18\x02 \x01(\t\x12\x14\n\x0cpayment_mode\x18\x03 \x01(\t\"\xd5\x01\n\x0e\x42ookingDetails\x12\x12\n\nbooking_id\x18\x01 \x01(\t\x12\x12\n\ntrain_name\x18\x02 \x01(\t\x12\x0e\n\x06source\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65stination\x18\x04 \x01(\t\x12\x1d\n\x15\x64\x61tetime_of_departure\x18\x05 \x01(\t\x12\x17\n\x0fnumber_of_seats\x18\x06 \x01(\x05\x12\x12\n\ntotal_cost\x18\x07 \x01(\x01\x12*\n\tseat_type\x18\x08 \x01(\x0e\x32\x17.train_booking.SeatType\".\n\x14GetMyBookingsRequest\x12\x16\n\x0e\x63ustomer_token\x18\x01 \x01(\t\">\n\x0b\x42ookingList\x12/\n\x08\x62ookings\x18\x01 \x03(\x0b\x32\x1d.train_booking.BookingDetails\"=\n\x04\x43ity\x12\x0f\n\x07\x63ity_id\x18\x01 \x01(\x05\x12\x11\n\tcity_name\x18\x02 \x01(\t\x12\x11\n\tcity_code\x18\x03 \x01(\t\"\x13\n\x11ListCitiesRequest\"9\n\x12ListCitiesResponse\x12#\n\x06\x63ities\x18\x01 \x03(\x0b\x32\x13.train_booking.City*?\n\x08SeatType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x07\n\x03\x41\x43\x31\x10\x01\x12\x07\n\x03\x41\x43\x32\x10\x02\x12\x07\n\x03\x41\x43\x33\x10\x03\x12\x0b\n\x07GENERAL\x10\x04\x32\xa7\x06\n\tTicketing\x12I\n\x08Register\x12\x1e.train_booking.RegisterRequest\x1a\x1d.train_booking.StatusResponse\x12\x42\n\x05Login\x12\x1b.train_booking.LoginRequest\x1a\x1c.train_booking.LoginResponse\x12\x45\n\x06Logout\x12\x1c.train_booking.LogoutRequest\x1a\x1d.train_booking.StatusResponse\x12I\n\x08\x41\x64\x64Train\x12\x1e.train_booking.AddTrainRequest\x1a\x1d.train_booking.StatusResponse\x12W\n\x0f\x41\x64\x64TrainService\x12%.train_booking.AddTrainServiceRequest\x1a\x1d.train_booking.StatusResponse\x12R\n\x13SearchTrainServices\x12\x1c.train_booking.SearchRequest\x1a\x1d.train_booking.SearchResponse\x12Q\n\nListCities\x12 .train_booking.ListCitiesRequest\x1a!.train_booking.ListCitiesResponse\x12P\n\tBookSeats\x12\x1f.train_booking.BookSeatsRequest\x1a\".train_booking.BookingConfirmation\x12U\n\x0eProcessPayment\x12$.train_booking.ProcessPaymentRequest\x1a\x1d.train_booking.StatusResponse\x12P\n\rGetMyBookings\x12#.train_booking.GetMyBookingsRequest\x1a\x1a.train_booking.BookingListb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13train_booking.proto\x12\rtrain_booking\"2\n\x0eStatusResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"5\n\x0fRegisterRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\t\"2\n\x0cLoginRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\t\"@\n\rLoginResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05token\x18\x03 \x01(\t\"\x1e\n\rLogoutRequest\x12\r\n\x05token\x18\x01 \x01(\t\"\x99\x01\n\x0f\x41\x64\x64TrainRequest\x12\x13\n\x0b\x61\x64min_token\x18\x01 \x01(\t\x12\x14\n\x0ctrain_number\x18\x02 \x01(\x05\x12\x12\n\ntrain_name\x18\x03 \x01(\t\x12\x16\n\x0esource_city_id\x18\x04 \x01(\x05\x12\x1b\n\x13\x64\x65stination_city_id\x18\x05 \x01(\x05\x12\x12\n\ntrain_type\x18\x06 \x01(\t\"^\n\x08SeatInfo\x12*\n\tseat_type\x18\x01 \x01(\x0e\x32\x17.train_booking.SeatType\x12\x17\n\x0fseats_available\x18\x02 \x01(\x05\x12\r\n\x05price\x18\x03 \x01(\x01\"\xab\x01\n\x16\x41\x64\x64TrainServiceRequest\x12\x13\n\x0b\x61\x64min_token\x18\x01 \x01(\t\x12\x14\n\x0ctrain_number\x18\x02 \x01(\x05\x12\x1d\n\x15\x64\x61tetime_of_departure\x18\x03 \x01(\t\x12\x1b\n\x13\x64\x61tetime_of_arrival\x18\x04 \x01(\t\x12*\n\tseat_info\x18\x05 \x03(\x0b\x32\x17.train_booking.SeatInfo\"R\n\rSearchRequest\x12\x16\n\x0esource_city_id\x18\x01 \x01(\x05\x12\x1b\n\x13\x64\x65stination_city_id\x18\x02 \x01(\x05\x12\x0c\n\x04\x64\x61te\x18\x03 \x01(\t\"\x97\x02\n\x0eServiceSummary\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\x14\n\x0ctrain_number\x18\x02 \x01(\x05\x12\x12\n\ntrain_name\x18\x03 \x01(\t\x12\x18\n\x10source_city_name\x18\x04 \x01(\t\x12\x1d\n\x15\x64\x65stination_city_name\x18\x05 \x01(\t\x12\x1d\n\x15\x64\x61tetime_of_departure\x18\x06 \x01(\t\x12\x1b\n\x13\x64\x61tetime_of_arrival\x18\x07 \x01(\t\x12*\n\tseat_type\x18\x08 \x01(\x0e\x32\x17.train_booking.SeatType\x12\x17\n\x0fseats_available\x18\t \x01(\x05\x12\r\n\x05price\x18\n \x01(\x01\"A\n\x0eSearchResponse\x12/\n\x08services\x18\x01 \x03(\x0b\x32\x1d.train_booking.ServiceSummary\"]\n\x16InitiateBookingRequest\x12\x16\n\x0e\x63ustomer_token\x18\x01 \x01(\t\x12\x12\n\nservice_id\x18\x02 \x01(\t\x12\x17\n\x0fnumber_of_seats\x18\x03 \x01(\x05\"_\n\x13\x42ookingConfirmation\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x12\n\nbooking_id\x18\x03 \x01(\t\x12\x12\n\ntotal_cost\x18\x04 \x01(\x01\"Y\n\x15ProcessPaymentRequest\x12\x16\n\x0e\x63ustomer_token\x18\x01 \x01(\t\x12\x12\n\nbooking_id\x18\x02 \x01(\t\x12\x14\n\x0cpayment_mode\x18\x03 \x01(\t\"\xe5\x01\n\x0e\x42ookingDetails\x12\x12\n\nbooking_id\x18\x01 \x01(\t\x12\x12\n\ntrain_name\x18\x02 \x01(\t\x12\x0e\n\x06source\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65stination\x18\x04 \x01(\t\x12\x1d\n\x15\x64\x61tetime_of_departure\x18\x05 \x01(\t\x12\x17\n\x0fnumber_of_seats\x18\x06 \x01(\x05\x12\x12\n\ntotal_cost\x18\x07 \x01(\x01\x12*\n\tseat_type\x18\x08 \x01(\x0e\x32\x17.train_booking.SeatType\x12\x0e\n\x06status\x18\t \x01(\t\".\n\x14GetMyBookingsRequest\x12\x16\n\x0e\x63ustomer_token\x18\x01 \x01(\t\">\n\x0b\x42ookingList\x12/\n\x08\x62ookings\x18\x01 \x03(\x0b\x32\x1d.train_booking.BookingDetails\"=\n\x04\x43ity\x12\x0f\n\x07\x63ity_id\x18\x01 \x01(\x05\x12\x11\n\tcity_name\x18\x02 \x01(\t\x12\x11\n\tcity_code\x18\x03 \x01(\t\"\x13\n\x11ListCitiesRequest\"9\n\x12ListCitiesResponse\x12#\n\x06\x63ities\x18\x01 \x03(\x0b\x32\x13.train_booking.City*?\n\x08SeatType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x07\n\x03\x41\x43\x31\x10\x01\x12\x07\n\x03\x41\x43\x32\x10\x02\x12\x07\n\x03\x41\x43\x33\x10\x03\x12\x0b\n\x07GENERAL\x10\x04\x32\xb3\x06\n\tTicketing\x12I\n\x08Register\x12\x1e.train_booking.RegisterRequest\x1a\x1d.train_booking.StatusResponse\x12\x42\n\x05Login\x12\x1b.train_booking.LoginRequest\x1a\x1c.train_booking.LoginResponse\x12\x45\n\x06Logout\x12\x1c.train_booking.LogoutRequest\x1a\x1d.train_booking.StatusResponse\x12Q\n\nListCities\x12 .train_booking.ListCitiesRequest\x1a!.train_booking.ListCitiesResponse\x12R\n\x13SearchTrainServices\x12\x1c.train_booking.SearchRequest\x1a\x1d.train_booking.SearchResponse\x12I\n\x08\x41\x64\x64Train\x12\x1e.train_booking.AddTrainRequest\x1a\x1d.train_booking.StatusResponse\x12W\n\x0f\x41\x64\x64TrainService\x12%.train_booking.AddTrainServiceRequest\x1a\x1d.train_booking.StatusResponse\x12\\\n\x0fInitiateBooking\x12%.train_booking.InitiateBookingRequest\x1a\".train_booking.BookingConfirmation\x12U\n\x0eProcessPayment\x12$.train_booking.ProcessPaymentRequest\x1a\x1d.train_booking.StatusResponse\x12P\n\rGetMyBookings\x12#.train_booking.GetMyBookingsRequest\x1a\x1a.train_booking.BookingListb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'train_booking_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_SEATTYPE']._serialized_start=1845
-  _globals['_SEATTYPE']._serialized_end=1908
+  _globals['_SEATTYPE']._serialized_start=1924
+  _globals['_SEATTYPE']._serialized_end=1987
   _globals['_STATUSRESPONSE']._serialized_start=38
   _globals['_STATUSRESPONSE']._serialized_end=88
   _globals['_REGISTERREQUEST']._serialized_start=90
@@ -52,27 +52,27 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SEARCHREQUEST']._serialized_start=721
   _globals['_SEARCHREQUEST']._serialized_end=803
   _globals['_SERVICESUMMARY']._serialized_start=806
-  _globals['_SERVICESUMMARY']._serialized_end=1028
-  _globals['_SEARCHRESPONSE']._serialized_start=1030
-  _globals['_SEARCHRESPONSE']._serialized_end=1095
-  _globals['_BOOKSEATSREQUEST']._serialized_start=1097
-  _globals['_BOOKSEATSREQUEST']._serialized_end=1184
-  _globals['_BOOKINGCONFIRMATION']._serialized_start=1186
-  _globals['_BOOKINGCONFIRMATION']._serialized_end=1281
-  _globals['_PROCESSPAYMENTREQUEST']._serialized_start=1283
-  _globals['_PROCESSPAYMENTREQUEST']._serialized_end=1372
-  _globals['_BOOKINGDETAILS']._serialized_start=1375
-  _globals['_BOOKINGDETAILS']._serialized_end=1588
-  _globals['_GETMYBOOKINGSREQUEST']._serialized_start=1590
-  _globals['_GETMYBOOKINGSREQUEST']._serialized_end=1636
-  _globals['_BOOKINGLIST']._serialized_start=1638
-  _globals['_BOOKINGLIST']._serialized_end=1700
-  _globals['_CITY']._serialized_start=1702
-  _globals['_CITY']._serialized_end=1763
-  _globals['_LISTCITIESREQUEST']._serialized_start=1765
-  _globals['_LISTCITIESREQUEST']._serialized_end=1784
-  _globals['_LISTCITIESRESPONSE']._serialized_start=1786
-  _globals['_LISTCITIESRESPONSE']._serialized_end=1843
-  _globals['_TICKETING']._serialized_start=1911
-  _globals['_TICKETING']._serialized_end=2718
+  _globals['_SERVICESUMMARY']._serialized_end=1085
+  _globals['_SEARCHRESPONSE']._serialized_start=1087
+  _globals['_SEARCHRESPONSE']._serialized_end=1152
+  _globals['_INITIATEBOOKINGREQUEST']._serialized_start=1154
+  _globals['_INITIATEBOOKINGREQUEST']._serialized_end=1247
+  _globals['_BOOKINGCONFIRMATION']._serialized_start=1249
+  _globals['_BOOKINGCONFIRMATION']._serialized_end=1344
+  _globals['_PROCESSPAYMENTREQUEST']._serialized_start=1346
+  _globals['_PROCESSPAYMENTREQUEST']._serialized_end=1435
+  _globals['_BOOKINGDETAILS']._serialized_start=1438
+  _globals['_BOOKINGDETAILS']._serialized_end=1667
+  _globals['_GETMYBOOKINGSREQUEST']._serialized_start=1669
+  _globals['_GETMYBOOKINGSREQUEST']._serialized_end=1715
+  _globals['_BOOKINGLIST']._serialized_start=1717
+  _globals['_BOOKINGLIST']._serialized_end=1779
+  _globals['_CITY']._serialized_start=1781
+  _globals['_CITY']._serialized_end=1842
+  _globals['_LISTCITIESREQUEST']._serialized_start=1844
+  _globals['_LISTCITIESREQUEST']._serialized_end=1863
+  _globals['_LISTCITIESRESPONSE']._serialized_start=1865
+  _globals['_LISTCITIESRESPONSE']._serialized_end=1922
+  _globals['_TICKETING']._serialized_start=1990
+  _globals['_TICKETING']._serialized_end=2809
 # @@protoc_insertion_point(module_scope)

@@ -128,14 +128,15 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             context.set_details(f"An internal error occurred: {e}")
             return train_booking_pb2.SearchResponse()
     
-    def BookSeats(self, request, context):
-        print(f"Request to book {request.number_of_seats} seats for service {request.service_id}")
+    def InitiateBooking(self, request, context):
+        print(f"Request to initiate booking for {request.number_of_seats} seats on service {request.service_id}")
+
         
         user = db_models.get_user_by_token(request.customer_token)
         if not user or user['role'] != 'CUSTOMER':
             return train_booking_pb2.BookingConfirmation(success=False, message="Unauthorized")
-        
-        success, message, booking_id, total_cost = db_models.book_seats(
+
+        success, message, booking_id, total_cost = db_models.initiate_booking_tx(
             user['user_id'],
             request.service_id,
             request.number_of_seats
@@ -147,6 +148,17 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             booking_id=booking_id or "",
             total_cost=total_cost or 0.0
         )
+
+    def ProcessPayment(self, request, context):
+        print(f"Request to process payment for booking_id: {request.booking_id}")
+        
+        user = db_models.get_user_by_token(request.customer_token)
+        if not user or user['role'] != 'CUSTOMER':
+            return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
+        
+        success, message = db_models.confirm_payment_tx(request.booking_id, request.payment_mode)
+
+        return train_booking_pb2.StatusResponse(success=success, message=message)
         
     def ListCities(self, request, context):
         print("Request to list all cities")
@@ -157,4 +169,31 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             city_proto.city_id = city_row['city_id']
             city_proto.city_name = city_row['city_name']
             city_proto.city_code = city_row['city_code']
+        return response
+    
+    def GetMyBookings(self, request, context):
+        print(f"Request to get bookings for token {request.customer_token[:8]}...")
+
+        user = db_models.get_user_by_token(request.customer_token)
+        if not user:
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid or expired token.")
+            return train_booking_pb2.BookingList()
+        
+        user_bookings = db_models.get_bookings_by_user_id(user['user_id'])
+        
+        response = train_booking_pb2.BookingList()
+        for row in user_bookings:
+            booking_details = response.bookings.add()
+            booking_details.booking_id = row['booking_id']
+            booking_details.train_name = row['train_name']
+            booking_details.source = row['source']
+            booking_details.destination = row['destination']
+            booking_details.datetime_of_departure = row['datetime_of_departure']
+            booking_details.number_of_seats = row['number_of_seats']
+            booking_details.total_cost = row['total_cost']
+            booking_details.seat_type = train_booking_pb2.SeatType.Value(row['seat_type'])
+            booking_details.status = row['status']
+            
+        print(f"Found {len(user_bookings)} bookings for user '{user['username']}'.")
         return response

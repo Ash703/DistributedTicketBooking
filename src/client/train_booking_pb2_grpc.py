@@ -26,7 +26,7 @@ if _version_not_supported:
 
 
 class TicketingStub(object):
-    """The main service for our train ticketing system.
+    """The main service for our ticketing system.
     """
 
     def __init__(self, channel):
@@ -50,6 +50,16 @@ class TicketingStub(object):
                 request_serializer=train__booking__pb2.LogoutRequest.SerializeToString,
                 response_deserializer=train__booking__pb2.StatusResponse.FromString,
                 _registered_method=True)
+        self.ListCities = channel.unary_unary(
+                '/train_booking.Ticketing/ListCities',
+                request_serializer=train__booking__pb2.ListCitiesRequest.SerializeToString,
+                response_deserializer=train__booking__pb2.ListCitiesResponse.FromString,
+                _registered_method=True)
+        self.SearchTrainServices = channel.unary_unary(
+                '/train_booking.Ticketing/SearchTrainServices',
+                request_serializer=train__booking__pb2.SearchRequest.SerializeToString,
+                response_deserializer=train__booking__pb2.SearchResponse.FromString,
+                _registered_method=True)
         self.AddTrain = channel.unary_unary(
                 '/train_booking.Ticketing/AddTrain',
                 request_serializer=train__booking__pb2.AddTrainRequest.SerializeToString,
@@ -60,19 +70,9 @@ class TicketingStub(object):
                 request_serializer=train__booking__pb2.AddTrainServiceRequest.SerializeToString,
                 response_deserializer=train__booking__pb2.StatusResponse.FromString,
                 _registered_method=True)
-        self.SearchTrainServices = channel.unary_unary(
-                '/train_booking.Ticketing/SearchTrainServices',
-                request_serializer=train__booking__pb2.SearchRequest.SerializeToString,
-                response_deserializer=train__booking__pb2.SearchResponse.FromString,
-                _registered_method=True)
-        self.ListCities = channel.unary_unary(
-                '/train_booking.Ticketing/ListCities',
-                request_serializer=train__booking__pb2.ListCitiesRequest.SerializeToString,
-                response_deserializer=train__booking__pb2.ListCitiesResponse.FromString,
-                _registered_method=True)
-        self.BookSeats = channel.unary_unary(
-                '/train_booking.Ticketing/BookSeats',
-                request_serializer=train__booking__pb2.BookSeatsRequest.SerializeToString,
+        self.InitiateBooking = channel.unary_unary(
+                '/train_booking.Ticketing/InitiateBooking',
+                request_serializer=train__booking__pb2.InitiateBookingRequest.SerializeToString,
                 response_deserializer=train__booking__pb2.BookingConfirmation.FromString,
                 _registered_method=True)
         self.ProcessPayment = channel.unary_unary(
@@ -88,19 +88,18 @@ class TicketingStub(object):
 
 
 class TicketingServicer(object):
-    """The main service for our train ticketing system.
+    """The main service for our ticketing system.
     """
 
     def Register(self, request, context):
-        """Allows a new customer to register.
+        """--- User Management ---
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Login(self, request, context):
-        """Authentication
-        """
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -111,8 +110,21 @@ class TicketingServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListCities(self, request, context):
+        """--- Public Information ---
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SearchTrainServices(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def AddTrain(self, request, context):
-        """Admin Functions
+        """--- Admin Functions ---
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -124,21 +136,9 @@ class TicketingServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SearchTrainServices(self, request, context):
-        """Customer Functions
+    def InitiateBooking(self, request, context):
+        """--- Customer Booking Flow ---
         """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ListCities(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def BookSeats(self, request, context):
-        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -173,6 +173,16 @@ def add_TicketingServicer_to_server(servicer, server):
                     request_deserializer=train__booking__pb2.LogoutRequest.FromString,
                     response_serializer=train__booking__pb2.StatusResponse.SerializeToString,
             ),
+            'ListCities': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListCities,
+                    request_deserializer=train__booking__pb2.ListCitiesRequest.FromString,
+                    response_serializer=train__booking__pb2.ListCitiesResponse.SerializeToString,
+            ),
+            'SearchTrainServices': grpc.unary_unary_rpc_method_handler(
+                    servicer.SearchTrainServices,
+                    request_deserializer=train__booking__pb2.SearchRequest.FromString,
+                    response_serializer=train__booking__pb2.SearchResponse.SerializeToString,
+            ),
             'AddTrain': grpc.unary_unary_rpc_method_handler(
                     servicer.AddTrain,
                     request_deserializer=train__booking__pb2.AddTrainRequest.FromString,
@@ -183,19 +193,9 @@ def add_TicketingServicer_to_server(servicer, server):
                     request_deserializer=train__booking__pb2.AddTrainServiceRequest.FromString,
                     response_serializer=train__booking__pb2.StatusResponse.SerializeToString,
             ),
-            'SearchTrainServices': grpc.unary_unary_rpc_method_handler(
-                    servicer.SearchTrainServices,
-                    request_deserializer=train__booking__pb2.SearchRequest.FromString,
-                    response_serializer=train__booking__pb2.SearchResponse.SerializeToString,
-            ),
-            'ListCities': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListCities,
-                    request_deserializer=train__booking__pb2.ListCitiesRequest.FromString,
-                    response_serializer=train__booking__pb2.ListCitiesResponse.SerializeToString,
-            ),
-            'BookSeats': grpc.unary_unary_rpc_method_handler(
-                    servicer.BookSeats,
-                    request_deserializer=train__booking__pb2.BookSeatsRequest.FromString,
+            'InitiateBooking': grpc.unary_unary_rpc_method_handler(
+                    servicer.InitiateBooking,
+                    request_deserializer=train__booking__pb2.InitiateBookingRequest.FromString,
                     response_serializer=train__booking__pb2.BookingConfirmation.SerializeToString,
             ),
             'ProcessPayment': grpc.unary_unary_rpc_method_handler(
@@ -217,7 +217,7 @@ def add_TicketingServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class Ticketing(object):
-    """The main service for our train ticketing system.
+    """The main service for our ticketing system.
     """
 
     @staticmethod
@@ -302,6 +302,60 @@ class Ticketing(object):
             _registered_method=True)
 
     @staticmethod
+    def ListCities(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/train_booking.Ticketing/ListCities',
+            train__booking__pb2.ListCitiesRequest.SerializeToString,
+            train__booking__pb2.ListCitiesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SearchTrainServices(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/train_booking.Ticketing/SearchTrainServices',
+            train__booking__pb2.SearchRequest.SerializeToString,
+            train__booking__pb2.SearchResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def AddTrain(request,
             target,
             options=(),
@@ -356,7 +410,7 @@ class Ticketing(object):
             _registered_method=True)
 
     @staticmethod
-    def SearchTrainServices(request,
+    def InitiateBooking(request,
             target,
             options=(),
             channel_credentials=None,
@@ -369,62 +423,8 @@ class Ticketing(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/train_booking.Ticketing/SearchTrainServices',
-            train__booking__pb2.SearchRequest.SerializeToString,
-            train__booking__pb2.SearchResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def ListCities(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/train_booking.Ticketing/ListCities',
-            train__booking__pb2.ListCitiesRequest.SerializeToString,
-            train__booking__pb2.ListCitiesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def BookSeats(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/train_booking.Ticketing/BookSeats',
-            train__booking__pb2.BookSeatsRequest.SerializeToString,
+            '/train_booking.Ticketing/InitiateBooking',
+            train__booking__pb2.InitiateBookingRequest.SerializeToString,
             train__booking__pb2.BookingConfirmation.FromString,
             options,
             channel_credentials,
