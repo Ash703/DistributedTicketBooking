@@ -177,7 +177,7 @@ def book_seats(user_id, service_id, num_seats):
         new_seat_count = service['seats_available'] - num_seats
         cursor.execute("UPDATE TrainServices SET seats_available = ? WHERE service_id = ?", (new_seat_count, service_id))
 
-        
+        #TODO: include status and timestamp to insert into Bookings
         booking_id = str(uuid.uuid4())
         cursor.execute("""
             INSERT INTO Bookings (booking_id, user_id, service_id, number_of_seats, total_cost)

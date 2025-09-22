@@ -17,7 +17,7 @@ service Ticketing {
   // Customer Functions
   rpc SearchTrainServices(SearchRequest) returns (SearchResponse);
   rpc ListCities(ListCitiesRequest) returns (ListCitiesResponse);
-  rpc InitiateBooking(InitiateBookingRequest) returns (BookingConfirmation);
+  rpc BookSeats(BookSeatsRequest) returns (BookingConfirmation);
   rpc ProcessPayment(ProcessPaymentRequest) returns (StatusResponse);
   rpc GetMyBookings(GetMyBookingsRequest) returns (BookingList);
 
@@ -119,11 +119,6 @@ message BookingConfirmation {
   string message = 2;
   string booking_id = 3;
   double total_cost = 4;
-}
-message InitiateBookingRequest {
-  string customer_token = 1;
-  string service_id = 2;
-  int32 number_of_seats = 3;
 }
 
 message ProcessPaymentRequest {
