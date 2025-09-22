@@ -7,3 +7,5 @@
 
 python -m src.server.main
 python -m src.client.main
+
+[Database View](https://sqliteviewer.app/)
