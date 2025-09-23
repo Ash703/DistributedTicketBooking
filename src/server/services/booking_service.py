@@ -4,9 +4,7 @@ import train_booking_pb2
 import train_booking_pb2_grpc
 from database import models as db_models
 from utils import security as security_utils
-
-# Session duration in seconds (e.g., 24 hours)
-SESSION_DURATION_SECONDS = 24 * 60 * 60
+from utils import config
 
 class BookingService(train_booking_pb2_grpc.TicketingServicer):
     """Implements the gRPC service for the booking application."""
@@ -38,7 +36,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             return train_booking_pb2.LoginResponse(success=False, message="Invalid credentials.")
         
         token = security_utils.generate_token()
-        expires_at = time.time() + SESSION_DURATION_SECONDS
+        expires_at = time.time() + config.SESSION_DURATION_SECONDS
         
         db_models.create_session(user['user_id'], token, expires_at)
         

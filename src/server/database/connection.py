@@ -2,13 +2,12 @@ import sqlite3
 import bcrypt
 import secrets
 import time
-
-DB_NAME = "TicketBooking.db"
+from utils import config
 
 # Database Initialization
 def get_db_connection():
     """Establishes a connection to the database, enabling foreign key support."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(config.DB_NAME)
     conn.execute("PRAGMA foreign_keys = ON") 
     conn.row_factory = sqlite3.Row
     return conn

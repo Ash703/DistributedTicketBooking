@@ -8,10 +8,10 @@
 Run compile_proto.ps1 / compile_proto.sh after each changes to proto file
 
 Server: 
-`python -m src/server/main.py`
+`python src/server/main.py`
 
 Client: 
-`python -m src/client/main.py`
+`python src/client/main.py`
 
 
 [Database Viewer](https://sqliteviewer.app/)

@@ -2,13 +2,12 @@ import sqlite3
 import bcrypt
 import secrets
 import time
-
-DB_NAME = "TicketBooking.db"
+from utils import config
 
 # Database Initialization
 def get_db():
     """Connect to SQLite database."""
-    return sqlite3.connect(DB_NAME)
+    return sqlite3.connect(config.DB_NAME)
 
 def get_db_connection():
     """Establishes a connection to the database, enabling foreign key support."""
