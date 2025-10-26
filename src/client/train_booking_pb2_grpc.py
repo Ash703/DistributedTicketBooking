@@ -85,6 +85,11 @@ class TicketingStub(object):
                 request_serializer=train__booking__pb2.GetMyBookingsRequest.SerializeToString,
                 response_deserializer=train__booking__pb2.BookingList.FromString,
                 _registered_method=True)
+        self.AskBot = channel.unary_stream(
+                '/train_booking.Ticketing/AskBot',
+                request_serializer=train__booking__pb2.LLMQuery.SerializeToString,
+                response_deserializer=train__booking__pb2.LLMAnswer.FromString,
+                _registered_method=True)
 
 
 class TicketingServicer(object):
@@ -155,6 +160,13 @@ class TicketingServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def AskBot(self, request, context):
+        """--- For LLM IAnswers ---
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_TicketingServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -207,6 +219,11 @@ def add_TicketingServicer_to_server(servicer, server):
                     servicer.GetMyBookings,
                     request_deserializer=train__booking__pb2.GetMyBookingsRequest.FromString,
                     response_serializer=train__booking__pb2.BookingList.SerializeToString,
+            ),
+            'AskBot': grpc.unary_stream_rpc_method_handler(
+                    servicer.AskBot,
+                    request_deserializer=train__booking__pb2.LLMQuery.FromString,
+                    response_serializer=train__booking__pb2.LLMAnswer.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -480,6 +497,33 @@ class Ticketing(object):
             '/train_booking.Ticketing/GetMyBookings',
             train__booking__pb2.GetMyBookingsRequest.SerializeToString,
             train__booking__pb2.BookingList.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AskBot(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/train_booking.Ticketing/AskBot',
+            train__booking__pb2.LLMQuery.SerializeToString,
+            train__booking__pb2.LLMAnswer.FromString,
             options,
             channel_credentials,
             insecure,

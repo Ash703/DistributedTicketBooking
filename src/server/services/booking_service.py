@@ -6,8 +6,10 @@ from database import models as db_models
 from utils import security as security_utils
 from utils import config
 
+
 class BookingService(train_booking_pb2_grpc.TicketingServicer):
     """Implements the gRPC service for the booking application."""
+    
 
     def Register(self, request, context):
         print(f"Registration attempt for username: {request.username}")
@@ -195,3 +197,59 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             
         print(f"Found {len(user_bookings)} bookings for user '{user['username']}'.")
         return response
+
+    def AskBot(self, request, context):
+        
+        user = db_models.get_user_by_token(request.customer_token)
+        if not user:
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid or expired token.")
+            return train_booking_pb2.LLMAnswer()
+        
+        user_bookings = db_models.get_bookings_by_user_id(user['user_id'])
+        
+        context_text = "The user has the following bookings: "
+        if not user_bookings:
+            context_text = "The user currently has no confirmed bookings."
+        else:
+            for booking in user_bookings:
+                context_text += (
+                    f"A booking for the '{booking['train_name']}' train. "
+                    f"It departs from '{booking['source']}' and goes to '{booking['destination']}' "
+                    f"on {booking['datetime_of_departure']}. "
+                    f"The status is {booking['status']}. "
+                )
+        try:
+            # Tokenize the question and context
+            inputs = self.tokenizer(
+                request.query, 
+                context_text, 
+                add_special_tokens=True, 
+                return_tensors="pt"
+            )
+            
+            # Get the model's output
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+
+            # Find the best start and end tokens for the answer
+            answer_start_index = torch.argmax(outputs.start_logits)
+            answer_end_index = torch.argmax(outputs.end_logits) + 1
+            
+            # Decode the tokens to get the answer string
+            input_ids = inputs["input_ids"].tolist()[0]
+            answer_tokens = input_ids[answer_start_index:answer_end_index]
+            answer = self.tokenizer.decode(answer_tokens, skip_special_tokens=True)
+            
+        
+            if not answer or "[SEP]" in answer or "[CLS]" in answer:
+                answer = "I'm sorry, I couldn't find a specific answer for that in your booking details."
+
+            print(f"  > LLM Answer: {answer}")
+            
+        except Exception as e:
+            print(f"  > LLM Error: {e}")
+            answer = "I'm sorry, I couldn't process that question."
+
+
+        return train_booking_pb2.LLMAnswer(answer=answer)

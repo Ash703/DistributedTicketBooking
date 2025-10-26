@@ -22,6 +22,8 @@ service Ticketing {
   rpc ProcessPayment(ProcessPaymentRequest) returns (StatusResponse);
   rpc GetMyBookings(GetMyBookingsRequest) returns (BookingList);
 
+  // --- For LLM IAnswers ---
+  rpc AskBot(LLMQuery) returns (stream LLMAnswer);
 }
 
 // Reusable status message for simple success/failure responses.
@@ -158,4 +160,14 @@ message ListCitiesRequest {}
 
 message ListCitiesResponse {
     repeated City cities = 1;
+}
+
+// --- LLM Query and Answers ---
+message LLMQuery {
+  string customer_token = 1;
+  string query = 2;
+}
+
+message LLMAnswer {
+  string answer = 1;
 }

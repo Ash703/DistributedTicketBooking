@@ -26,11 +26,10 @@ def stream_llm_response(user_message: str, user_id: int, session_id: str):
         temperature=0.3,
     )
 
-    # Use a generator pattern so this can plug into web frameworks
     for chunk in stream:
         delta = chunk.choices[0].delta
         if delta and delta.content:
-            yield delta.content  # send partial text piece-by-piece
+            yield delta.content  
 
 print("\n--- done ---")
 
@@ -40,3 +39,4 @@ if __name__ == "__main__":
     for token in stream_llm_response(user_query, 12304, "SHSYX2834"):
         print(token, end="", flush=True)
     print("\n--- done ---")
+    
