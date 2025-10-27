@@ -5,12 +5,20 @@ import train_booking_pb2_grpc
 from database import models as db_models
 from utils import security as security_utils
 from utils import config
+from openai import OpenAI
 
 
 class BookingService(train_booking_pb2_grpc.TicketingServicer):
     """Implements the gRPC service for the booking application."""
-    
-
+    def __init__(self):
+        try:
+            self.client = OpenAI(
+            base_url="http://127.0.0.1:50390",  #local llm url
+            api_key="not-needed"
+            )
+        except:
+            print("ChatBot is not available.")
+            pass
     def Register(self, request, context):
         print(f"Registration attempt for username: {request.username}")
         
@@ -219,37 +227,30 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                     f"on {booking['datetime_of_departure']}. "
                     f"The status is {booking['status']}. "
                 )
+        system_prompt = (
+        f"You are a train booking assistant for user ID {user['user_id']}."
+        f"You MUST ONLY answer questions related to train bookings or schedules."
+        f"Your knowledge is STRICTLY LIMITED to the information provided in the context below."
+        f"If the user asks about ANYTHING else (e.g., weather, politics, general knowledge, your name),"
+        f"you MUST politely refuse to answer"
+        f"Here is all the information you have about the user's current bookings: {context_text}."
+    )
         try:
-            # Tokenize the question and context
-            inputs = self.tokenizer(
-                request.query, 
-                context_text, 
-                add_special_tokens=True, 
-                return_tensors="pt"
+            stream = self.client.chat.completions.create(
+            model="mistral",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": request.query}
+            ],
+            stream=True,
+            temperature=0.3,
             )
-            
-            # Get the model's output
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-
-            # Find the best start and end tokens for the answer
-            answer_start_index = torch.argmax(outputs.start_logits)
-            answer_end_index = torch.argmax(outputs.end_logits) + 1
-            
-            # Decode the tokens to get the answer string
-            input_ids = inputs["input_ids"].tolist()[0]
-            answer_tokens = input_ids[answer_start_index:answer_end_index]
-            answer = self.tokenizer.decode(answer_tokens, skip_special_tokens=True)
-            
-        
-            if not answer or "[SEP]" in answer or "[CLS]" in answer:
-                answer = "I'm sorry, I couldn't find a specific answer for that in your booking details."
-
-            print(f"  > LLM Answer: {answer}")
+            for chunk in stream:
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    yield train_booking_pb2.LLMAnswer(answer=delta.content)
             
         except Exception as e:
             print(f"  > LLM Error: {e}")
             answer = "I'm sorry, I couldn't process that question."
-
-
-        return train_booking_pb2.LLMAnswer(answer=answer)
+            yield train_booking_pb2.LLMAnswer(answer=answer)

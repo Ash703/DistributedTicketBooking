@@ -271,10 +271,9 @@ def do_ask_bot(stub, token):
         
         try:
             print("\nBot:", end=" ", flush=True)
-            # The AskBot RPC is streaming, so we must loop over the response
             for chunk in stub.AskBot(req):
                 print(chunk.answer, end="", flush=True)
-            print("\n") # Newline after the bot finishes
+            print("\n")
         except grpc.RpcError as e:
             print(f"\nRPC Error: {e.details()}")
             break
