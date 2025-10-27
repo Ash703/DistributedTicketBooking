@@ -11,7 +11,7 @@ Server:
 `python src/server/main.py`
 
 Client: 
-`python src/client/main.py`
+`python src/client/command_line_main.py`
 
 
 [Database Viewer](https://sqliteviewer.app/)
