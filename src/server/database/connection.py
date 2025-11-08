@@ -1,24 +1,25 @@
-import sqlite3
+import asyncio
+import aiosqlite
 import bcrypt
 import secrets
 import time
 from utils import config
 
 # Database Initialization
-def get_db_connection():
+async def get_db_connection():
     """Establishes a connection to the database, enabling foreign key support."""
-    conn = sqlite3.connect(config.DB_NAME)
-    conn.execute("PRAGMA foreign_keys = ON") 
-    conn.row_factory = sqlite3.Row
+    conn = await aiosqlite.connect(config.DB_NAME)
+    await conn.execute("PRAGMA foreign_keys = ON") 
+    conn.row_factory = aiosqlite.Row
     return conn
 
-def init_db():
+async def init_db():
     """Initialize users and sessions tables."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = await get_db_connection()
+    cursor = await conn.cursor()
 
     # 1. Users Table
-    cursor.execute("""
+    await cursor.execute("""
     CREATE TABLE IF NOT EXISTS Users (
         user_id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -28,7 +29,7 @@ def init_db():
     """)
 
     # 2. Session Table
-    cursor.execute("""
+    await cursor.execute("""
     CREATE TABLE IF NOT EXISTS Sessions (
     token TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
@@ -39,7 +40,7 @@ def init_db():
     """)
 
     # 3. Train Table
-    cursor.execute("""
+    await cursor.execute("""
     CREATE TABLE IF NOT EXISTS Trains (
         train_number INTEGER PRIMARY KEY,
         train_name TEXT NOT NULL,
@@ -52,7 +53,7 @@ def init_db():
     """)
 
     # 4. TrainService Table
-    cursor.execute("""
+    await cursor.execute("""
     CREATE TABLE IF NOT EXISTS TrainServices (
     service_id TEXT PRIMARY KEY,
     train_number INTEGER NOT NULL,
@@ -66,7 +67,7 @@ def init_db():
     """)
 
     # 5. Booking Table
-    cursor.execute("""
+    await cursor.execute("""
     CREATE TABLE IF NOT EXISTS Bookings (
     booking_id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
@@ -81,7 +82,7 @@ def init_db():
     """)
     
     # 6. Payment Table
-    cursor.execute("""
+    await cursor.execute("""
     CREATE TABLE IF NOT EXISTS Payments (
     payment_id TEXT PRIMARY KEY,
     booking_id TEXT NOT NULL,
@@ -95,7 +96,7 @@ def init_db():
     """)
     
     # 7. City Table
-    cursor.execute("""
+    await cursor.execute("""
     CREATE TABLE IF NOT EXISTS Cities (
         city_id INTEGER PRIMARY KEY AUTOINCREMENT,
         city_name TEXT UNIQUE NOT NULL,
@@ -110,11 +111,11 @@ def init_db():
         hashed_admin_pass = bcrypt.hashpw(admin_pass, bcrypt.gensalt())
         hashed_cust_pass = bcrypt.hashpw(cust_pass, bcrypt.gensalt())
 
-        cursor.execute("INSERT OR IGNORE INTO Users (username, hashed_password, role) VALUES (?, ?, ?)",
+        await cursor.execute("INSERT OR IGNORE INTO Users (username, hashed_password, role) VALUES (?, ?, ?)",
                        ('admin', hashed_admin_pass, 'ADMIN'))
-        cursor.execute("INSERT OR IGNORE INTO Users (username, hashed_password, role) VALUES (?, ?, ?)",
+        await cursor.execute("INSERT OR IGNORE INTO Users (username, hashed_password, role) VALUES (?, ?, ?)",
                        ('customer', hashed_cust_pass, 'CUSTOMER'))
-    except sqlite3.IntegrityError:
+    except aiosqlite.IntegrityError:
         print("Default users already exist.")
     
     cities_to_add = [
@@ -123,14 +124,12 @@ def init_db():
         ('Jaipur', 'JP'),
         ('Chennai Central', 'MAS')
     ]
-    cursor.executemany("INSERT OR IGNORE INTO Cities (city_name, city_code) VALUES (?, ?)", cities_to_add)
-
+    await cursor.executemany("INSERT OR IGNORE INTO Cities (city_name, city_code) VALUES (?, ?)", cities_to_add)
         
-        
-    conn.commit()
-    conn.close()
+    await conn.commit()
+    await conn.close()
     print("\nDatabase initialized successfully.")
 
 
 if __name__ == '__main__':
-    init_db()
+    asyncio.run(init_db())

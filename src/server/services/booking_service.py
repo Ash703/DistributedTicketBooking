@@ -5,21 +5,21 @@ import train_booking_pb2_grpc
 from database import models as db_models
 from utils import security as security_utils
 from utils import config
-from openai import OpenAI
-
+from openai import AsyncOpenAI
+import asyncio
 
 class BookingService(train_booking_pb2_grpc.TicketingServicer):
     """Implements the gRPC service for the booking application."""
     def __init__(self):
         try:
-            self.client = OpenAI(
+            self.client = AsyncOpenAI(
             base_url="http://127.0.0.1:50390",  #local llm url
             api_key="not-needed"
             )
         except:
             print("ChatBot is not available.")
             pass
-    def Register(self, request, context):
+    async def Register(self, request, context):
         print(f"Registration attempt for username: {request.username}")
         
         if not request.username or not request.password:
@@ -27,17 +27,17 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             
         hashed_password = security_utils.hash_password(request.password)
         
-        success = db_models.create_user(request.username, hashed_password)
+        success = await db_models.create_user(request.username, hashed_password)
         
         if success:
             return train_booking_pb2.StatusResponse(success=True, message="Registration successful.")
         else:
             return train_booking_pb2.StatusResponse(success=False, message="Username already exists.")
 
-    def Login(self, request, context):
+    async def Login(self, request, context):
         print(f"Login attempt for user: {request.username}")
 
-        user = db_models.get_user_by_username(request.username)
+        user = await db_models.get_user_by_username(request.username)
         
         if not user:
             return train_booking_pb2.LoginResponse(success=False, message="Invalid credentials.")
@@ -48,19 +48,19 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         token = security_utils.generate_token()
         expires_at = time.time() + config.SESSION_DURATION_SECONDS
         
-        db_models.create_session(user['user_id'], token, expires_at)
+        await db_models.create_session(user['user_id'], token, expires_at)
         
         print(f"Login successful for {request.username}.")
         return train_booking_pb2.LoginResponse(success=True, message="Login successful.", token=token)
     
-    def AddTrain(self, request, context):
+    async def AddTrain(self, request, context):
         print(f"Request to add new train: {request.train_number}")
         
-        admin_user = db_models.get_user_by_token(request.admin_token)
+        admin_user = await db_models.get_user_by_token(request.admin_token)
         if not admin_user or admin_user['role'] != 'ADMIN':
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
         
-        success = db_models.add_train(
+        success = await db_models.add_train(
             request.train_number,
             request.train_name,
             request.source_city_id,
@@ -73,11 +73,11 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         else:
             return train_booking_pb2.StatusResponse(success=False, message="Train number already exists.")
 
-    def AddTrainService(self, request, context):
+    async def AddTrainService(self, request, context):
         print(f"Request to add new service for train: {request.train_number}")
 
 
-        admin_user = db_models.get_user_by_token(request.admin_token)
+        admin_user = await db_models.get_user_by_token(request.admin_token)
         if not admin_user or admin_user['role'] != 'ADMIN':
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
         
@@ -88,7 +88,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             'price': info.price
         } for info in request.seat_info]
         
-        success = db_models.add_train_service(
+        success = await db_models.add_train_service(
             request.train_number,
             request.datetime_of_departure,
             request.datetime_of_arrival,
@@ -100,7 +100,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         else:
             return train_booking_pb2.StatusResponse(success=False, message="Failed to add train services.")
     
-    def SearchTrainServices(self, request, context):
+    async def SearchTrainServices(self, request, context):
         """
         Handles a customer's request to search for available train services.
         """
@@ -108,7 +108,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         print(f"Request to search for trains from city ID {request.source_city_id} to {request.destination_city_id} on {request.date}")
         
         try: 
-            services_from_db = db_models.search_services(
+            services_from_db = await db_models.search_services(
                 request.source_city_id,
                 request.destination_city_id,
                 request.date
@@ -136,15 +136,15 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             context.set_details(f"An internal error occurred: {e}")
             return train_booking_pb2.SearchResponse()
     
-    def InitiateBooking(self, request, context):
+    async def InitiateBooking(self, request, context):
         print(f"Request to initiate booking for {request.number_of_seats} seats on service {request.service_id}")
 
         
-        user = db_models.get_user_by_token(request.customer_token)
+        user = await db_models.get_user_by_token(request.customer_token)
         if not user or user['role'] != 'CUSTOMER':
             return train_booking_pb2.BookingConfirmation(success=False, message="Unauthorized")
 
-        success, message, booking_id, total_cost = db_models.initiate_booking_tx(
+        success, message, booking_id, total_cost = await db_models.initiate_booking_tx(
             user['user_id'],
             request.service_id,
             request.number_of_seats
@@ -157,20 +157,20 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             total_cost=total_cost or 0.0
         )
 
-    def ProcessPayment(self, request, context):
+    async def ProcessPayment(self, request, context):
         print(f"Request to process payment for booking_id: {request.booking_id}")
         
-        user = db_models.get_user_by_token(request.customer_token)
+        user = await db_models.get_user_by_token(request.customer_token)
         if not user or user['role'] != 'CUSTOMER':
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
         
-        success, message = db_models.confirm_payment_tx(request.booking_id, request.payment_mode)
+        success, message = await db_models.confirm_payment_tx(request.booking_id, request.payment_mode)
 
         return train_booking_pb2.StatusResponse(success=success, message=message)
         
-    def ListCities(self, request, context):
+    async def ListCities(self, request, context):
         print("Request to list all cities")
-        cities_from_db = db_models.get_all_cities()
+        cities_from_db = await db_models.get_all_cities()
         response = train_booking_pb2.ListCitiesResponse()
         for city_row in cities_from_db:
             city_proto = response.cities.add()
@@ -179,16 +179,16 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             city_proto.city_code = city_row['city_code']
         return response
     
-    def GetMyBookings(self, request, context):
+    async def GetMyBookings(self, request, context):
         print(f"Request to get bookings for token {request.customer_token[:8]}...")
 
-        user = db_models.get_user_by_token(request.customer_token)
+        user = await db_models.get_user_by_token(request.customer_token)
         if not user:
             context.set_code(grpc.StatusCode.UNAUTHENTICATED)
             context.set_details("Invalid or expired token.")
             return train_booking_pb2.BookingList()
         
-        user_bookings = db_models.get_bookings_by_user_id(user['user_id'])
+        user_bookings = await db_models.get_bookings_by_user_id(user['user_id'])
         
         response = train_booking_pb2.BookingList()
         for row in user_bookings:
@@ -206,15 +206,16 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         print(f"Found {len(user_bookings)} bookings for user '{user['username']}'.")
         return response
 
-    def AskBot(self, request, context):
+    async def AskBot(self, request, context):
         
-        user = db_models.get_user_by_token(request.customer_token)
+        user = await db_models.get_user_by_token(request.customer_token)
         if not user:
             context.set_code(grpc.StatusCode.UNAUTHENTICATED)
             context.set_details("Invalid or expired token.")
-            return train_booking_pb2.LLMAnswer()
+            yield train_booking_pb2.LLMAnswer(answer="Unauthorized.")
+            return
         
-        user_bookings = db_models.get_bookings_by_user_id(user['user_id'])
+        user_bookings = await db_models.get_bookings_by_user_id(user['user_id'])
         
         context_text = "The user has the following bookings: "
         if not user_bookings:
@@ -236,7 +237,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         f"Here is all the information you have about the user's current bookings: {context_text}."
     )
         try:
-            stream = self.client.chat.completions.create(
+            stream = await self.client.chat.completions.create(
             model="mistral",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -245,7 +246,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             stream=True,
             temperature=0.3,
             )
-            for chunk in stream:
+            async for chunk in stream:
                 delta = chunk.choices[0].delta
                 if delta and delta.content:
                     yield train_booking_pb2.LLMAnswer(answer=delta.content)
