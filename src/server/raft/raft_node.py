@@ -3,6 +3,12 @@ import random
 import grpc
 import train_booking_pb2
 import train_booking_pb2_grpc
+from dataclasses import dataclass
+
+@dataclass
+class RaftLogEntry:
+    term: int
+    command: str
 
 class RaftNode(train_booking_pb2_grpc.RaftServicer):
     def __init__(self, node_id, peers):
@@ -15,6 +21,7 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
         self.commit_index = 0
         self.last_applied = 0
         self.leader_id = None
+        self.log: list[RaftLogEntry] = []
 
         self.heartbeat_received = asyncio.Event()
         self.running = True
@@ -119,21 +126,36 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
         for peer in self.peers:
             asyncio.create_task(self.append_entries_to_peer(peer))
 
-    async def append_entries_to_peer(self, peer):
+    async def append_entries_to_peer(self, peer, start_index=None):
+        """Send one or more log entries (for replication or catch-up)."""
         if isinstance(peer, tuple):
-            peer = f"{peer[0]}:{peer[1]}"  # convert tuple → "host:port"
+            peer = f"{peer[0]}:{peer[1]}"
 
         try:
+            # Default to sending everything after the last committed entry
+            if start_index is None:
+                start_index = self.commit_index
+
+            # Entries to send
+            entries_to_send = self.log[start_index:]
+
+            prev_log_index = start_index - 1
+            prev_log_term = self.log[prev_log_index - 1].term if prev_log_index > 0 else 0
+
             async with grpc.aio.insecure_channel(peer) as channel:
                 stub = train_booking_pb2_grpc.RaftStub(channel)
                 req = train_booking_pb2.AppendEntriesRequest(
                     term=self.current_term,
                     leader_id=self.node_id,
-                    prev_log_index=len(self.log),
-                    prev_log_term=self.log[-1].term if self.log else 0,
-                    entries=[],  # empty means heartbeat
+                    prev_log_index=prev_log_index,
+                    prev_log_term=prev_log_term,
+                    entries=[
+                        train_booking_pb2.LogEntry(command=e.command, term=e.term)
+                        for e in entries_to_send
+                    ],
                     leader_commit=self.commit_index
                 )
-                await stub.AppendEntries(req)
+                return await stub.AppendEntries(req)
+
         except Exception as e:
-            print(f"[{self.node_id}] Heartbeat to {peer} failed: \n{e}")
+            print(f"[{self.node_id}] AppendEntries to {peer} failed: {e}")

@@ -7,10 +7,17 @@
 
 Run compile_proto.ps1 / compile_proto.sh after each changes to proto file
 
-Server: 
-`python src/server/main.py`
+## Server: 
+### terminal 1
+`python src/server/main.py 1`
 
-Client: 
+### terminal 2
+`python src/server/main.py 2`
+
+### terminal 3
+`python src/server/main.py 3`
+
+## Client: 
 `python src/client/command_line_main.py`
 
 

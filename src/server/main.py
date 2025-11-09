@@ -4,18 +4,20 @@ import train_booking_pb2_grpc
 from raft.raft_node import RaftNode
 from services.booking_service import BookingService
 from database import connection as db_connection
-
+from utils import config
 
 async def serve(node_id, port, peers):
     """
     Starts the async gRPC server and waits for requests.
     """
+    config.DB_NAME = f"Node{node_id}" + config.DB_NAME
     await db_connection.init_db()  # async DB initialization
 
-    server = grpc.aio.server()  # Async gRPC server
-    train_booking_pb2_grpc.add_TicketingServicer_to_server(BookingService(), server)
-
     raft_node = RaftNode(node_id=node_id, peers=peers)
+
+    server = grpc.aio.server()  # Async gRPC server
+    train_booking_pb2_grpc.add_TicketingServicer_to_server(BookingService(raft_node), server)
+
     train_booking_pb2_grpc.add_RaftServicer_to_server(raft_node, server)
     await raft_node.start()
 
