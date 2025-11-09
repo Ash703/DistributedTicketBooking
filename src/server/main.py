@@ -1,11 +1,12 @@
 import asyncio
 import grpc
 import train_booking_pb2_grpc
+from raft.raft_node import RaftNode
 from services.booking_service import BookingService
 from database import connection as db_connection
 
 
-async def serve():
+async def serve(node_id, port, peers):
     """
     Starts the async gRPC server and waits for requests.
     """
@@ -13,7 +14,12 @@ async def serve():
 
     server = grpc.aio.server()  # Async gRPC server
     train_booking_pb2_grpc.add_TicketingServicer_to_server(BookingService(), server)
-    server.add_insecure_port('[::]:50051')
+
+    raft_node = RaftNode(node_id=node_id, peers=peers)
+    train_booking_pb2_grpc.add_RaftServicer_to_server(raft_node, server)
+    await raft_node.start()
+
+    server.add_insecure_port(f'[::]:{port}')
 
     print("Starting async gRPC server on port 50051...")
     await server.start()
@@ -29,4 +35,15 @@ async def serve():
 
 
 if __name__ == '__main__':
-    asyncio.run(serve())
+    import sys
+    nodes = [
+        {"id": 1, "port": 50051},
+        {"id": 2, "port": 50052},
+        {"id": 3, "port": 50053},
+    ]
+
+    node_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+    current = next(n for n in nodes if n["id"] == node_id)
+    peers = [(f"localhost", n["port"]) for n in nodes if n["id"] != node_id]
+
+    asyncio.run(serve(current["id"], current["port"], peers))
