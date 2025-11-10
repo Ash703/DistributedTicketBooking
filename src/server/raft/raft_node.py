@@ -121,7 +121,8 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
                 )
                 return await stub.RequestVote(req)
         except Exception as e:
-            print(f"[{self.node_id}] Failed to contact {peer}: {e}")
+            # print(f"[{self.node_id}] Failed to contact {peer}: {e}")
+            print(f"[{self.node_id}] Failed to contact {peer}: Server may be down.")
 
     async def RequestVote(self, request, context):
         """Handle incoming vote requests."""
@@ -262,7 +263,8 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
                 resp = await stub.AppendEntries(req)
                 return resp
         except Exception as e:
-            print(f"[{self.node_id}] AppendEntries to {peer} failed: {e}")
+            # print(f"[{self.node_id}] AppendEntries to {peer} failed: {e}")
+            print(f"[{self.node_id}] AppendEntries to {peer} failed: Server may be down.")
             return None
 
     async def handle_client_command(self, command: str):
@@ -352,11 +354,25 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
                     print(f"[{self.node_id}] User '{username}' registered via Raft log.")
                 else:
                     print(f"[{self.node_id}] Malformed REGISTER command: {payload}")
+            
+            # -------------------------------
+            # LOGIN
+            # -------------------------------
+            elif command.startswith("CREATE_SESSION:"):
+                parts = command.split(":", 1)[1].split(",")
+                if len(parts) >= 3:
+                    user_id = int(parts[0])
+                    token = parts[1]
+                    expires_at = float(parts[2])
+                    await db_models.create_session(user_id, token, expires_at)
+                    print(f"[{self.node_id}] Login Session Token created via Raft log.")
+                else:
+                    print(f"[{self.node_id}] Malformed Login Session Token command: {payload}")
 
             # -------------------------------
             # ADD_TRAIN
             # -------------------------------
-            if command.startswith("ADD_TRAIN:"):
+            elif command.startswith("ADD_TRAIN:"):
                 payload = command.split(":", 1)[1]
                 parts = [p.strip() for p in payload.split(",")]
                 if len(parts) >= 5:

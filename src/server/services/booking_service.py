@@ -52,6 +52,13 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
     async def Login(self, request, context):
         print(f"Login attempt for user: {request.username}")
 
+        if self.raft.state != "leader":
+            leader = self.raft.leader_id or "unknown"
+            return train_booking_pb2.StatusResponse(
+                success=False,
+                message=f"This node is not the leader. Please contact leader {leader}."
+            )
+
         user = await db_models.get_user_by_username(request.username)
         
         if not user:
@@ -64,7 +71,14 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         expires_at = time.time() + config.SESSION_DURATION_SECONDS
         
         await db_models.create_session(user['user_id'], token, expires_at)
+
+        # Propose a Raft entry for session creation
+        command = f"CREATE_SESSION:{user['user_id']},{token},{expires_at}"
+        raft_success, raft_msg = await self.raft.handle_client_command(command)
         
+        if not raft_success:
+            return train_booking_pb2.LoginResponse(success=False, message=raft_msg)
+
         print(f"Login successful for {request.username}.")
         return train_booking_pb2.LoginResponse(success=True, message="Login successful.", token=token)
     

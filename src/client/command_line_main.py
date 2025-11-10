@@ -30,7 +30,7 @@ def detect_and_redirect_if_not_leader(response_message):
                 return True
     return False
 
-def call_with_leader_redirect(rpc_func, request, max_retries=3):
+def call_with_leader_redirect(rpc_name, request, max_retries=3):
     """
     Calls a gRPC RPC with automatic leader redirection and node failover.
     Retries across nodes if the current node is unavailable or not the leader.
@@ -43,7 +43,9 @@ def call_with_leader_redirect(rpc_func, request, max_retries=3):
     while attempt < max_retries:
         stub, channel = get_stub(current_node)
         try:
-            resp = rpc_func(request)
+
+            rpc_method = getattr(stub, rpc_name)
+            resp = rpc_method(request)
 
             # --- Handle leader redirection ---
             if hasattr(resp, "message") and "not the leader" in resp.message.lower():
@@ -75,8 +77,12 @@ def call_with_leader_redirect(rpc_func, request, max_retries=3):
         finally:
             channel.close()
 
-    # --- Return a simple dict for failure ---
-    return {"success": False, "message": "All nodes unreachable or request failed."}
+    class FallbackResponse:
+        def __init__(self):
+            self.success = False
+            self.message = "All nodes unreachable or request failed."
+
+    return FallbackResponse()
 
 # --- Helper Functions for UI ---
 
@@ -147,7 +153,7 @@ def do_login(stub):
     
     try:
         req = train_booking_pb2.LoginRequest(username=username, password=password)
-        resp = call_with_leader_redirect(stub.Login, req)
+        resp = call_with_leader_redirect("Login", req)
         
         if resp.success:
             print(f"\nLogin successful. {resp.message}")
@@ -170,8 +176,8 @@ def do_register(stub):
     password = get_input("New Password")
     
     try:
-        req = train_booking_pb2.LoginRequest(username=username, password=password)
-        resp = call_with_leader_redirect(stub.Login, req)
+        req = train_booking_pb2.RegisterRequest(username=username, password=password)
+        resp = call_with_leader_redirect(stub.Register, req)
         print(f"\n{resp.message}")
     except grpc.RpcError as e:
         print(f"\nRPC Error: {e.details()}")
@@ -375,7 +381,7 @@ def do_add_train(stub, token):
     )
     
     try:
-        resp = stub.AddTrain(req)
+        resp = call_with_leader_redirect(stub.AddTrain,req)
         print(f"\n{resp.message}")
     except grpc.RpcError as e:
         print(f"\nRPC Error: {e.details()}")

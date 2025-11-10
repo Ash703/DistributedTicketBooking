@@ -21,3 +21,4 @@ build/
 
 # DB
 *.db
+*.json
