@@ -30,27 +30,53 @@ def detect_and_redirect_if_not_leader(response_message):
                 return True
     return False
 
-def call_with_leader_redirect(rpc_func, request):
+def call_with_leader_redirect(rpc_func, request, max_retries=3):
     """
-    Calls a gRPC RPC with automatic leader redirection if needed.
-    rpc_func: e.g., stub.AddTrain or stub.Register
+    Calls a gRPC RPC with automatic leader redirection and node failover.
+    Retries across nodes if the current node is unavailable or not the leader.
+    Always returns an object (either real response or dict with 'success' and 'message').
     """
     global current_node
-    stub, channel = get_stub(current_node)
-    try:
-        resp = rpc_func(request)
-        # If we get a redirect hint, update and retry once
-        if hasattr(resp, "message") and "not the leader" in resp.message.lower():
-            if detect_and_redirect_if_not_leader(resp.message):
-                channel.close()
-                stub, channel = get_stub(current_node)
-                resp = rpc_func(request)
-        return resp
-    except grpc.RpcError as e:
-        print(f"RPC Error from {current_node}: {e.details()}")
-        return None
-    finally:
-        channel.close()
+    attempt = 0
+    tried_nodes = set()
+
+    while attempt < max_retries:
+        stub, channel = get_stub(current_node)
+        try:
+            resp = rpc_func(request)
+
+            # --- Handle leader redirection ---
+            if hasattr(resp, "message") and "not the leader" in resp.message.lower():
+                if detect_and_redirect_if_not_leader(resp.message):
+                    channel.close()
+                    continue
+
+            return resp
+
+        except grpc.RpcError as e:
+            code = e.code()
+            details = e.details() or ""
+            print(f"RPC Error from {current_node}: {details or code.name}")
+
+            # --- Handle connectivity errors ---
+            if code in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
+                tried_nodes.add(current_node)
+                next_candidates = [n for n in NODES if n not in tried_nodes]
+                if not next_candidates:
+                    print("All nodes unreachable. Cluster may be down.")
+                    break
+                current_node = next_candidates[0]
+                print(f"Retrying on next node: {current_node}")
+                attempt += 1
+                continue
+            else:
+                break  # Non-retryable error
+
+        finally:
+            channel.close()
+
+    # --- Return a simple dict for failure ---
+    return {"success": False, "message": "All nodes unreachable or request failed."}
 
 # --- Helper Functions for UI ---
 
