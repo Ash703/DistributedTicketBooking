@@ -26,15 +26,28 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         
         if not request.username or not request.password:
             return train_booking_pb2.StatusResponse(success=False, message="Username and password cannot be empty.")
+        
+        if self.raft.state != "leader":
+            leader = self.raft.leader_id or "unknown"
+            return train_booking_pb2.StatusResponse(
+                success=False,
+                message=f"This node is not the leader. Please contact leader {leader}."
+            )
             
         hashed_password = security_utils.hash_password(request.password)
         
         success = await db_models.create_user(request.username, hashed_password)
         
-        if success:
-            return train_booking_pb2.StatusResponse(success=True, message="Registration successful.")
-        else:
+        if not success:
             return train_booking_pb2.StatusResponse(success=False, message="Username already exists.")
+        
+        command = f"REGISTER:{request.username},{hashed_password.decode('utf-8')},CUSTOMER"
+        raft_success, raft_msg = await self.raft.handle_client_command(command)
+
+        if not raft_success:
+            return train_booking_pb2.StatusResponse(success=False, message=raft_msg)
+
+        return train_booking_pb2.StatusResponse(success=True, message="Registration successful.")
 
     async def Login(self, request, context):
         print(f"Login attempt for user: {request.username}")
@@ -57,6 +70,13 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
     
     async def AddTrain(self, request, context):
         print(f"Request to add new train: {request.train_number}")
+
+        if self.raft.state != "leader":
+            leader = self.raft.leader_id or "unknown"
+            return train_booking_pb2.StatusResponse(
+                success=False,
+                message=f"This node is not the leader. Please contact leader {leader}."
+            )
         
         admin_user = await db_models.get_user_by_token(request.admin_token)
         if not admin_user or admin_user['role'] != 'ADMIN':
@@ -70,10 +90,16 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             request.train_type
         )
 
-        if success:
-            return train_booking_pb2.StatusResponse(success=True, message="Train added successfully.")
-        else:
+        if not success:
             return train_booking_pb2.StatusResponse(success=False, message="Train number already exists.")
+        
+        command = f"ADD_TRAIN:{request.train_number},{request.train_name},{request.source_city_id},{request.destination_city_id},{request.train_type}"
+        raft_success, raft_msg = await self.raft.handle_client_command(command)
+
+        if not raft_success:
+            return train_booking_pb2.StatusResponse(success=False, message=raft_msg)
+
+        return train_booking_pb2.StatusResponse(success=True, message="Train added successfully.")
 
     async def AddTrainService(self, request, context):
         print(f"Request to add new service for train: {request.train_number}")
@@ -83,6 +109,12 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not admin_user or admin_user['role'] != 'ADMIN':
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
         
+        if self.raft.state != "leader":
+            leader = self.raft.leader_id or "unknown"
+            return train_booking_pb2.StatusResponse(
+                success=False,
+                message=f"This node is not the leader. Please contact leader {leader}."
+            )
 
         seat_info_list = [{
             'seat_type': train_booking_pb2.SeatType.Name(info.seat_type),
@@ -97,10 +129,16 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             seat_info_list
         )
 
-        if success:
-            return train_booking_pb2.StatusResponse(success=True, message="Train services added successfully.")
-        else:
+        if not success:
             return train_booking_pb2.StatusResponse(success=False, message="Failed to add train services.")
+
+        command = f"ADD_SERVICE:{request.train_number},{request.datetime_of_departure},{request.datetime_of_arrival}," + "|".join(seat_info_list)
+        raft_success, raft_msg = await self.raft.handle_client_command(command)
+
+        if not raft_success:
+            return train_booking_pb2.StatusResponse(success=False, message=raft_msg)
+
+        return train_booking_pb2.StatusResponse(success=True, message="Train services added successfully.")
     
     async def SearchTrainServices(self, request, context):
         """
@@ -141,6 +179,12 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
     async def InitiateBooking(self, request, context):
         print(f"Request to initiate booking for {request.number_of_seats} seats on service {request.service_id}")
 
+        if self.raft.state != "leader":
+            leader = self.raft.leader_id or "unknown"
+            return train_booking_pb2.StatusResponse(
+                success=False,
+                message=f"This node is not the leader. Please contact leader {leader}."
+        )
         
         user = await db_models.get_user_by_token(request.customer_token)
         if not user or user['role'] != 'CUSTOMER':
@@ -151,6 +195,15 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             request.service_id,
             request.number_of_seats
         )
+
+        if not success:
+            return train_booking_pb2.BookingConfirmation(success=False, message=message, booking_id=booking_id or "", total_cost=total_cost or 0.0)
+
+        command = f"BOOK_SEATS:{user['user_id']},{request.service_id},{request.number_of_seats}"
+        raft_success, raft_msg = await self.raft.handle_client_command(command)
+
+        if not raft_success:
+            return train_booking_pb2.BookingConfirmation(success=False, message=raft_msg, booking_id=booking_id or "", total_cost=total_cost or 0.0)
         
         return train_booking_pb2.BookingConfirmation(
             success=success,
@@ -166,9 +219,25 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not user or user['role'] != 'CUSTOMER':
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
         
+        if self.raft.state != "leader":
+            leader = self.raft.leader_id or "unknown"
+            return train_booking_pb2.StatusResponse(
+                success=False,
+                message=f"This node is not the leader. Please contact leader {leader}."
+        )
+        
         success, message = await db_models.confirm_payment_tx(request.booking_id, request.payment_mode)
 
-        return train_booking_pb2.StatusResponse(success=success, message=message)
+        if not success:
+            return train_booking_pb2.StatusResponse(success=False, message=message)
+
+        command = f"CONFIRM_PAYMENT:{request.booking_id},{request.payment_mode}"
+        raft_success, raft_msg = await self.raft.handle_client_command(command)
+
+        if not raft_success:
+            return train_booking_pb2.StatusResponse(success=False, message=raft_msg)
+
+        return train_booking_pb2.StatusResponse(success=True, message="Payment processed successfully.")
         
     async def ListCities(self, request, context):
         print("Request to list all cities")
