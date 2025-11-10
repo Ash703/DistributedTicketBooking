@@ -1,8 +1,56 @@
 import grpc
 import train_booking_pb2
 import train_booking_pb2_grpc
-import sys
-import time
+
+# --- Leader Discovery Support ---
+NODES = ["localhost:50051", "localhost:50052", "localhost:50053"]
+current_node = NODES[0]
+
+def get_stub(address):
+    """Creates a stub for a given node address."""
+    channel = grpc.insecure_channel(address)
+    return train_booking_pb2_grpc.TicketingStub(channel), channel
+
+def detect_and_redirect_if_not_leader(response_message):
+    """
+    Detects 'not leader' message and updates current_node accordingly.
+    Expected message format:
+      'This node is not the leader. Please contact leader 50052.'
+    """
+    global current_node
+    if "not the leader" in response_message.lower():
+        import re
+        match = re.search(r"leader\s+(\d+)", response_message)
+        if match:
+            leader_port = match.group(1)
+            new_node = f"localhost:{leader_port}"
+            if new_node != current_node:
+                print(f"\nRedirecting to leader node at {new_node}...\n")
+                current_node = new_node
+                return True
+    return False
+
+def call_with_leader_redirect(rpc_func, request):
+    """
+    Calls a gRPC RPC with automatic leader redirection if needed.
+    rpc_func: e.g., stub.AddTrain or stub.Register
+    """
+    global current_node
+    stub, channel = get_stub(current_node)
+    try:
+        resp = rpc_func(request)
+        # If we get a redirect hint, update and retry once
+        if hasattr(resp, "message") and "not the leader" in resp.message.lower():
+            if detect_and_redirect_if_not_leader(resp.message):
+                channel.close()
+                stub, channel = get_stub(current_node)
+                resp = rpc_func(request)
+        return resp
+    except grpc.RpcError as e:
+        print(f"RPC Error from {current_node}: {e.details()}")
+        return None
+    finally:
+        channel.close()
 
 # --- Helper Functions for UI ---
 
@@ -73,7 +121,7 @@ def do_login(stub):
     
     try:
         req = train_booking_pb2.LoginRequest(username=username, password=password)
-        resp = stub.Login(req)
+        resp = call_with_leader_redirect(stub.Login, req)
         
         if resp.success:
             print(f"\nLogin successful. {resp.message}")
@@ -96,8 +144,8 @@ def do_register(stub):
     password = get_input("New Password")
     
     try:
-        req = train_booking_pb2.RegisterRequest(username=username, password=password)
-        resp = stub.Register(req)
+        req = train_booking_pb2.LoginRequest(username=username, password=password)
+        resp = call_with_leader_redirect(stub.Login, req)
         print(f"\n{resp.message}")
     except grpc.RpcError as e:
         print(f"\nRPC Error: {e.details()}")
@@ -203,7 +251,7 @@ def do_search_and_book(stub, token):
             service_id=service_to_book.service_id,
             number_of_seats=num_seats
         )
-        init_resp = stub.InitiateBooking(init_req)
+        init_resp = call_with_leader_redirect(stub.InitiateBooking, init_req)
         
         if not init_resp.success:
             print(f"\nBooking Failed: {init_resp.message}")
@@ -224,7 +272,7 @@ def do_search_and_book(stub, token):
             booking_id=init_resp.booking_id,
             payment_mode="CommandLinePay"
         )
-        pay_resp = stub.ProcessPayment(pay_req)
+        pay_resp = call_with_leader_redirect(stub.ProcessPayment, pay_req)
         
         print(f"\n{pay_resp.message}")
         
@@ -343,7 +391,7 @@ def do_add_service(stub, token):
     )
     
     try:
-        resp = stub.AddTrainService(req)
+        resp = call_with_leader_redirect(stub.AddTrainService,req)
         print(f"\n{resp.message}")
     except grpc.RpcError as e:
         print(f"\nRPC Error: {e.details()}")
@@ -354,13 +402,12 @@ def run():
     """Main application loop."""
     # Connect to the server
     try:
-        channel = grpc.insecure_channel('localhost:50051')
-        stub = train_booking_pb2_grpc.TicketingStub(channel)
+        stub, channel = get_stub(current_node)
         # Check if server is running
         stub.ListCities(train_booking_pb2.ListCitiesRequest(), timeout=2)
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.UNAVAILABLE:
-            print("Error: Cannot connect to the server at localhost:50051.")
+            print(f"Error: Cannot connect to the server at {current_node}.")
             print("Please ensure the server is running.")
             return
         else:
