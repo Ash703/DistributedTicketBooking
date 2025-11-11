@@ -9,6 +9,7 @@ from utils import config
 async def get_db_connection():
     """Establishes a connection to the database, enabling foreign key support."""
     conn = await aiosqlite.connect(config.DB_NAME)
+    await conn.execute("PRAGMA journal_mode=WAL")
     await conn.execute("PRAGMA foreign_keys = ON") 
     conn.row_factory = aiosqlite.Row
     return conn
@@ -46,7 +47,10 @@ async def init_db():
         train_name TEXT NOT NULL,
         source_city_id INTEGER NOT NULL,
         destination_city_id INTEGER NOT NULL,
-        train_type TEXT,
+        train_type NOT NULL CHECK(train_type IN (
+            'Express', 'Superfast', 'Rajdhani', 'Duronto', 
+            'Shatabdi', 'Garib Rath', 'Special', 'Mail'
+        )),
         FOREIGN KEY(source_city_id) REFERENCES Cities(city_id),
         FOREIGN KEY(destination_city_id) REFERENCES Cities(city_id)
     )
@@ -121,8 +125,21 @@ async def init_db():
     cities_to_add = [
         ('New Delhi', 'NDLS'),
         ('Mumbai Central', 'MMCT'),
+        ('Howrah (Kolkata)', 'HWH'),
+        ('Mumbai CSMT', 'CSMT'),
+        ('Kanpur Central', 'CNB'),
+        ('Patna Junction', 'PNBE'),
+        ('Vijayawada Junction', 'BZA'),
+        ('Kalyan Junction', 'KYN'),
+        ('Prayagraj Junction', 'PRYJ'),
+        ('Itarsi Junction', 'ET'),
+        ('Vadodara Junction', 'BRC'),
+        ('Chennai Central', 'MAS'),
         ('Jaipur', 'JP'),
-        ('Chennai Central', 'MAS')
+        ('Bengaluru City', 'SBC'),
+        ('Ahmedabad', 'ADI'),
+        ('Pune Junction', 'PUNE'),
+        ('Lucknow', 'LKO')
     ]
     await cursor.executemany("INSERT OR IGNORE INTO Cities (city_name, city_code) VALUES (?, ?)", cities_to_add)
         
