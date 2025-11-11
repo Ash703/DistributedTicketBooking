@@ -20,10 +20,11 @@ def detect_and_redirect_if_not_leader(response_message):
     global current_node
     if "not the leader" in response_message.lower():
         import re
+        print(response_message)
         match = re.search(r"leader\s+(\d+)", response_message)
         if match:
-            leader_port = match.group(1)
-            new_node = f"localhost:{leader_port}"
+            leader_id = match.group(1)
+            new_node = NODES[int(leader_id)-1]
             if new_node != current_node:
                 print(f"\nRedirecting to leader node at {new_node}...\n")
                 current_node = new_node

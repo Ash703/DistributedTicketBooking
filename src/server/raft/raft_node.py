@@ -24,6 +24,7 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
         self.last_applied = 0
         self.leader_id = None
         self.log: list[RaftLogEntry] = []
+        self.db_lock = asyncio.Lock()
 
         self.heartbeat_received = asyncio.Event()
         self.running = True
@@ -340,116 +341,117 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
         print(f"[{self.node_id}] Applying command: {command}")
 
         try:
-            # -------------------------------
-            # REGISTER
-            # -------------------------------
-            if command.startswith("REGISTER:"):
-                # e.g. REGISTER:alice,$2b$12$xyz123,ADMIN
-                payload = command.split(":", 1)[1]
-                parts = [p.strip() for p in payload.split(",")]
-                if len(parts) >= 3:
-                    username = parts[0]
-                    hashed_password = parts[1].encode("utf-8")
-                    await db_models.create_user(username, hashed_password)
-                    print(f"[{self.node_id}] User '{username}' registered via Raft log.")
+            async with self.db_lock:
+                # -------------------------------
+                # REGISTER
+                # -------------------------------
+                if command.startswith("REGISTER:"):
+                    # e.g. REGISTER:alice,$2b$12$xyz123,ADMIN
+                    payload = command.split(":", 1)[1]
+                    parts = [p.strip() for p in payload.split(",")]
+                    if len(parts) >= 3:
+                        username = parts[0]
+                        hashed_password = parts[1].encode("utf-8")
+                        await db_models.create_user(username, hashed_password)
+                        print(f"[{self.node_id}] User '{username}' registered via Raft log.")
+                    else:
+                        print(f"[{self.node_id}] Malformed REGISTER command: {payload}")
+                
+                # -------------------------------
+                # LOGIN
+                # -------------------------------
+                elif command.startswith("CREATE_SESSION:"):
+                    parts = command.split(":", 1)[1].split(",")
+                    if len(parts) >= 3:
+                        user_id = int(parts[0])
+                        token = parts[1]
+                        expires_at = float(parts[2])
+                        await db_models.create_session(user_id, token, expires_at)
+                        print(f"[{self.node_id}] Login Session Token created via Raft log.")
+                    else:
+                        print(f"[{self.node_id}] Malformed Login Session Token command: {payload}")
+
+                # -------------------------------
+                # ADD_TRAIN
+                # -------------------------------
+                elif command.startswith("ADD_TRAIN:"):
+                    payload = command.split(":", 1)[1]
+                    parts = [p.strip() for p in payload.split(",")]
+                    if len(parts) >= 5:
+                        train_number = int(parts[0])
+                        train_name = parts[1]
+                        src = int(parts[2])
+                        dst = int(parts[3])
+                        train_type = parts[4]
+                        await db_models.add_train(train_number, train_name, src, dst, train_type)
+                        print(f"[{self.node_id}] Train added via Raft log.")
+                    else:
+                        print(f"[{self.node_id}] Malformed ADD_TRAIN command: {payload}")
+
+                # -------------------------------
+                # ADD_SERVICE
+                # -------------------------------
+                elif command.startswith("ADD_SERVICE:"):
+                    # e.g. ADD_SERVICE:101,2025-11-10 12:00,2025-11-10 18:00,AC2,120,750
+                    payload = command.split(":", 1)[1]
+                    parts = [p.strip() for p in payload.split(",")]
+                    if len(parts) >= 6:
+                        train_number = int(parts[0])
+                        datetime_of_departure = parts[1]
+                        datetime_of_arrival = parts[2]
+                        seat_type = parts[3]
+                        seats_available = int(parts[4])
+                        price = float(parts[5])
+
+                        seat_info_list = [{
+                            "seat_type": seat_type,
+                            "seats_available": seats_available,
+                            "price": price
+                        }]
+
+                        await db_models.add_train_service(
+                            train_number,
+                            datetime_of_departure,
+                            datetime_of_arrival,
+                            seat_info_list
+                        )
+                        print(f"[{self.node_id}] Train service added via Raft log.")
+                    else:
+                        print(f"[{self.node_id}] Malformed ADD_SERVICE command: {payload}")
+
+                # -------------------------------
+                # BOOK_SEATS
+                # -------------------------------
+                elif command.startswith("BOOK_SEATS:"):
+                    # e.g. BOOK_SEATS:4,svc_20251108A,3
+                    payload = command.split(":", 1)[1]
+                    parts = [p.strip() for p in payload.split(",")]
+                    if len(parts) >= 3:
+                        user_id = int(parts[0])
+                        service_id = parts[1]
+                        seats = int(parts[2])
+                        await db_models.initiate_booking_tx(user_id, service_id, seats)
+                        print(f"[{self.node_id}] Booking created via Raft log.")
+                    else:
+                        print(f"[{self.node_id}] Malformed BOOK_SEATS command: {payload}")
+
+                # -------------------------------
+                # CONFIRM_PAYMENT
+                # -------------------------------
+                elif command.startswith("CONFIRM_PAYMENT:"):
+                    # e.g. CONFIRM_PAYMENT:bk_93847,UPI
+                    payload = command.split(":", 1)[1]
+                    parts = [p.strip() for p in payload.split(",")]
+                    if len(parts) >= 2:
+                        booking_id = parts[0]
+                        payment_mode = parts[1]
+                        await db_models.confirm_payment_tx(booking_id, payment_mode)
+                        print(f"[{self.node_id}] Payment confirmed via Raft log.")
+                    else:
+                        print(f"[{self.node_id}] Malformed CONFIRM_PAYMENT command: {payload}")
+
                 else:
-                    print(f"[{self.node_id}] Malformed REGISTER command: {payload}")
-            
-            # -------------------------------
-            # LOGIN
-            # -------------------------------
-            elif command.startswith("CREATE_SESSION:"):
-                parts = command.split(":", 1)[1].split(",")
-                if len(parts) >= 3:
-                    user_id = int(parts[0])
-                    token = parts[1]
-                    expires_at = float(parts[2])
-                    await db_models.create_session(user_id, token, expires_at)
-                    print(f"[{self.node_id}] Login Session Token created via Raft log.")
-                else:
-                    print(f"[{self.node_id}] Malformed Login Session Token command: {payload}")
-
-            # -------------------------------
-            # ADD_TRAIN
-            # -------------------------------
-            elif command.startswith("ADD_TRAIN:"):
-                payload = command.split(":", 1)[1]
-                parts = [p.strip() for p in payload.split(",")]
-                if len(parts) >= 5:
-                    train_number = int(parts[0])
-                    train_name = parts[1]
-                    src = int(parts[2])
-                    dst = int(parts[3])
-                    train_type = parts[4]
-                    await db_models.add_train(train_number, train_name, src, dst, train_type)
-                    print(f"[{self.node_id}] Train added via Raft log.")
-                else:
-                    print(f"[{self.node_id}] Malformed ADD_TRAIN command: {payload}")
-
-            # -------------------------------
-            # ADD_SERVICE
-            # -------------------------------
-            elif command.startswith("ADD_SERVICE:"):
-                # e.g. ADD_SERVICE:101,2025-11-10 12:00,2025-11-10 18:00,AC2,120,750
-                payload = command.split(":", 1)[1]
-                parts = [p.strip() for p in payload.split(",")]
-                if len(parts) >= 6:
-                    train_number = int(parts[0])
-                    datetime_of_departure = parts[1]
-                    datetime_of_arrival = parts[2]
-                    seat_type = parts[3]
-                    seats_available = int(parts[4])
-                    price = float(parts[5])
-
-                    seat_info_list = [{
-                        "seat_type": seat_type,
-                        "seats_available": seats_available,
-                        "price": price
-                    }]
-
-                    await db_models.add_train_service(
-                        train_number,
-                        datetime_of_departure,
-                        datetime_of_arrival,
-                        seat_info_list
-                    )
-                    print(f"[{self.node_id}] Train service added via Raft log.")
-                else:
-                    print(f"[{self.node_id}] Malformed ADD_SERVICE command: {payload}")
-
-            # -------------------------------
-            # BOOK_SEATS
-            # -------------------------------
-            elif command.startswith("BOOK_SEATS:"):
-                # e.g. BOOK_SEATS:4,svc_20251108A,3
-                payload = command.split(":", 1)[1]
-                parts = [p.strip() for p in payload.split(",")]
-                if len(parts) >= 3:
-                    user_id = int(parts[0])
-                    service_id = parts[1]
-                    seats = int(parts[2])
-                    await db_models.initiate_booking_tx(user_id, service_id, seats)
-                    print(f"[{self.node_id}] Booking created via Raft log.")
-                else:
-                    print(f"[{self.node_id}] Malformed BOOK_SEATS command: {payload}")
-
-            # -------------------------------
-            # CONFIRM_PAYMENT
-            # -------------------------------
-            elif command.startswith("CONFIRM_PAYMENT:"):
-                # e.g. CONFIRM_PAYMENT:bk_93847,UPI
-                payload = command.split(":", 1)[1]
-                parts = [p.strip() for p in payload.split(",")]
-                if len(parts) >= 2:
-                    booking_id = parts[0]
-                    payment_mode = parts[1]
-                    await db_models.confirm_payment_tx(booking_id, payment_mode)
-                    print(f"[{self.node_id}] Payment confirmed via Raft log.")
-                else:
-                    print(f"[{self.node_id}] Malformed CONFIRM_PAYMENT command: {payload}")
-
-            else:
-                print(f"[{self.node_id}] Unknown command (no-op): {command}")
+                    print(f"[{self.node_id}] Unknown command (no-op): {command}")
 
         except Exception as e:
             print(f"[{self.node_id}] Failed to apply log entry: {e}")
