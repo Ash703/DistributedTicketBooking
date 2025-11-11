@@ -25,6 +25,8 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
         self.leader_id = None
         self.log: list[RaftLogEntry] = []
         self.db_lock = asyncio.Lock()
+        self.apply_lock = asyncio.Lock()
+        self.applying = False
 
         self.heartbeat_received = asyncio.Event()
         self.running = True
@@ -53,6 +55,7 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
                         )
                         for e in data.get("log", [])
                     ]
+                    self.last_applied = data.get("last_applied_index", 0)
                 print(f"[{self.node_id}] Loaded persistent state: term={self.current_term}, log_len={len(self.log)}")
             except Exception as e:
                 print(f"[{self.node_id}] Failed to load state: {e}")
@@ -64,7 +67,8 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
                 data = {
                     "current_term": self.current_term,
                     "voted_for": self.voted_for,
-                    "log": [{"term": e.term, "command": e.command} for e in self.log]
+                    "log": [{"term": e.term, "command": e.command} for e in self.log],
+                    "last_applied_index": self.last_applied
                 }
                 json.dump(data, f, indent=2)
         except Exception as e:
@@ -303,8 +307,8 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
             print(f"[{self.node_id}] Log entry committed: {command}")
 
             # Apply committed entries to local DB (apply only newly committed)
-            if self.last_applied < self.commit_index:
-                await self.apply_log_entries()
+            # if self.last_applied < self.commit_index:
+            #     await self.apply_log_entries()
             return True, "Committed"
         else:
             print(f"[{self.node_id}] Failed to commit command: {command}")
@@ -321,10 +325,17 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
         """
 
         # Apply entries from last_applied (count) up to commit_index (count)
-        while self.last_applied < self.commit_index:
-            entry = self.log[self.last_applied]  # protobuf LogEntry
-            await self.apply_log_entry(entry)
-            self.last_applied += 1
+        if self.applying:
+            return
+        self.applying = True
+        async with self.apply_lock:
+            try:
+                while self.last_applied < self.commit_index:
+                    entry = self.log[self.last_applied]
+                    await self.apply_log_entry(entry)
+                    self.last_applied += 1
+            finally:
+                self.applying = False
 
     async def apply_log_entry(self, log_entry):
         """
@@ -452,6 +463,7 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
 
                 else:
                     print(f"[{self.node_id}] Unknown command (no-op): {command}")
+            self.save_state()
 
         except Exception as e:
             print(f"[{self.node_id}] Failed to apply log entry: {e}")
