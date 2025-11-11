@@ -178,7 +178,7 @@ def do_register(stub):
     
     try:
         req = train_booking_pb2.RegisterRequest(username=username, password=password)
-        resp = call_with_leader_redirect(stub.Register, req)
+        resp = call_with_leader_redirect("Register", req)
         print(f"\n{resp.message}")
     except grpc.RpcError as e:
         print(f"\nRPC Error: {e.details()}")
@@ -284,7 +284,7 @@ def do_search_and_book(stub, token):
             service_id=service_to_book.service_id,
             number_of_seats=num_seats
         )
-        init_resp = call_with_leader_redirect(stub.InitiateBooking, init_req)
+        init_resp = call_with_leader_redirect("InitiateBooking", init_req)
         
         if not init_resp.success:
             print(f"\nBooking Failed: {init_resp.message}")
@@ -305,7 +305,7 @@ def do_search_and_book(stub, token):
             booking_id=init_resp.booking_id,
             payment_mode="CommandLinePay"
         )
-        pay_resp = call_with_leader_redirect(stub.ProcessPayment, pay_req)
+        pay_resp = call_with_leader_redirect("ProcessPayment", pay_req)
         
         print(f"\n{pay_resp.message}")
         
@@ -382,7 +382,7 @@ def do_add_train(stub, token):
     )
     
     try:
-        resp = call_with_leader_redirect(stub.AddTrain,req)
+        resp = call_with_leader_redirect("AddTrain",req)
         print(f"\n{resp.message}")
     except grpc.RpcError as e:
         print(f"\nRPC Error: {e.details()}")
@@ -424,7 +424,7 @@ def do_add_service(stub, token):
     )
     
     try:
-        resp = call_with_leader_redirect(stub.AddTrainService,req)
+        resp = call_with_leader_redirect("AddTrainService",req)
         print(f"\n{resp.message}")
     except grpc.RpcError as e:
         print(f"\nRPC Error: {e.details()}")
