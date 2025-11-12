@@ -186,7 +186,8 @@ def do_register(stub):
 def do_logout(stub, token):
     """Handles logging out."""
     try:
-        stub.Logout(train_booking_pb2.LogoutRequest(token=token))
+        req = train_booking_pb2.LogoutRequest(token=token)
+        call_with_leader_redirect("Logout",req)
     except grpc.RpcError as e:
         # Logout is best-effort, so we don't need to over-handle errors
         pass
@@ -198,7 +199,7 @@ def do_list_cities(stub):
     print_header("Available Cities")
     try:
         req = train_booking_pb2.ListCitiesRequest()
-        resp = stub.ListCities(req)
+        resp = call_with_leader_redirect("ListCities",req)
         
         if not resp.cities:
             print("No cities found in the system.")
@@ -232,7 +233,7 @@ def do_search_services(stub):
             destination_city_id=dest_id,
             date=date
         )
-        resp = stub.SearchTrainServices(req)
+        resp = call_with_leader_redirect("SearchTrainServices",req)
         
         if not resp.services:
             print("\nNo services found matching your criteria.")
@@ -317,7 +318,7 @@ def do_view_bookings(stub, token):
     print_header("My Bookings")
     try:
         req = train_booking_pb2.GetMyBookingsRequest(customer_token=token)
-        resp = stub.GetMyBookings(req)
+        resp = call_with_leader_redirect("GetMyBookings",req)
         
         if not resp.bookings:
             print("You have no bookings.")
@@ -352,7 +353,7 @@ def do_ask_bot(stub, token):
         
         try:
             print("\nBot:", end=" ", flush=True)
-            for chunk in stub.AskBot(req):
+            for chunk in call_with_leader_redirect("AskBot",req):
                 print(chunk.answer, end="", flush=True)
             print("\n")
         except grpc.RpcError as e:
@@ -437,7 +438,8 @@ def run():
     try:
         stub, channel = get_stub(current_node)
         # Check if server is running
-        stub.ListCities(train_booking_pb2.ListCitiesRequest(), timeout=2)
+        req = train_booking_pb2.ListCitiesRequest()
+        call_with_leader_redirect("ListCities",req)
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.UNAVAILABLE:
             print(f"Error: Cannot connect to the server at {current_node}.")

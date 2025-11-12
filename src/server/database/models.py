@@ -20,6 +20,11 @@ async def create_user(username, hashed_password):
         return True
     except aiosqlite.IntegrityError:
         # This error occurs if the username is already taken
+        await conn.rollback()
+        return False
+    except Exception as e:
+        await conn.rollback()
+        print(f"create_user failed: {e}")
         return False
     finally:
         await conn.close()
@@ -39,14 +44,22 @@ async def get_user_by_username(username):
 async def create_session(user_id, token, expires_at):
     """Creates a new session for a user."""
     conn = await get_db_connection()
-    cursor = await conn.cursor()
-    await cursor.execute(
-        "INSERT INTO Sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-        (token, user_id, time.time(), expires_at)
-    )
-    await conn.commit()
-    await conn.close()
-
+    try:
+        await conn.execute(
+            "INSERT INTO Sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+            (token, user_id, time.time(), expires_at)
+        )
+        await conn.commit()
+    except aiosqlite.IntegrityError:
+        await conn.rollback()  # duplicate token, must rollback
+        print(f"Duplicate session token detected.")
+        return False
+    except Exception as e:
+        await conn.rollback()
+        print(f"create_session failed: {e}")
+        return False
+    finally:
+        await conn.close()
 async def get_user_by_token(token):
     """
     Validates a session token and retrieves the associated user.
@@ -66,10 +79,15 @@ async def get_user_by_token(token):
 async def delete_session(token):
     """Deletes a session record, effectively logging the user out."""
     conn = await get_db_connection()
-    cursor = await conn.cursor()
-    await cursor.execute("DELETE FROM Sessions WHERE token = ?", (token,))
-    await conn.commit()
-    await conn.close()
+    try:
+        await conn.execute("DELETE FROM Sessions WHERE token = ?", (token,))
+        await conn.commit()
+    except Exception as e:
+        await conn.rollback()
+        print(f"delete_session failed: {e}")
+        return False
+    finally:
+        await conn.close()
     
 async def get_all_cities():
     """Retrieves all cities from the Cities table."""
@@ -93,6 +111,11 @@ async def add_train(train_number, train_name, source_city_id, destination_city_i
         await conn.commit()
         return True
     except aiosqlite.IntegrityError:
+        await conn.rollback()
+        return False
+    except Exception as e:
+        await conn.rollback()
+        print(f"add_train failed: {e}")
         return False
     finally:
         await conn.close()
@@ -146,6 +169,7 @@ async def add_train_service(train_number, dt_departure, dt_arrival, seat_info):
         return True
     except Exception as e:
         print(f"Error adding train service: {e}")
+        await conn.rollback()
         return False
     finally:
         await conn.close()

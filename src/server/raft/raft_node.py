@@ -27,6 +27,8 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
         self.db_lock = asyncio.Lock()
         self.apply_lock = asyncio.Lock()
         self.applying = False
+        self.next_index = {}
+        self.match_index = {}
 
         self.heartbeat_received = asyncio.Event()
         self.running = True
@@ -77,6 +79,9 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
     async def election_timer(self):
         """Manages election timeout and starts elections when needed."""
         while self.running:
+            if self.state == "leader":
+                await asyncio.sleep(1.0)
+                continue
             timeout = random.uniform(3.0, 6.0) + random.random() * int(self.node_id)  # seconds
             try:
                 await asyncio.wait_for(self.heartbeat_received.wait(), timeout)
@@ -108,6 +113,13 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
             self.state = "leader"
             self.leader_id = self.node_id
             self.heartbeat_received.clear()
+
+            for peer in self.peers:
+                if isinstance(peer, tuple):
+                    peer = f"{peer[0]}:{peer[1]}"
+                self.next_index[peer] = len(self.log)
+                self.match_index[peer] = 0
+
         else:
             print(f"[{self.node_id}] Election failed with {votes} votes.")
 
@@ -210,7 +222,7 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
 
         # Apply newly committed entries to local DB
         # Note: apply_log_entries will process from last_applied up to commit_index
-        if self.commit_index > self.last_applied:
+        if self.commit_index > self.last_applied and not self.applying:
             asyncio.create_task(self.apply_log_entries())
 
         return train_booking_pb2.AppendEntriesResponse(term=self.current_term, success=True)
@@ -225,7 +237,96 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
     async def send_heartbeats(self):
         """Send AppendEntries RPCs to all peers."""
         for peer in self.peers:
-            asyncio.create_task(self.append_entries_to_peer(peer))
+            asyncio.create_task(self.replicate_to_peer(peer))
+
+    async def replicate_to_peer(self, peer):
+        """
+        Ensure the given follower's log is up to date with the leader's log.
+        Implements Raft catch-up replication using nextIndex and matchIndex tracking.
+        """
+        if isinstance(peer, tuple):
+            peer = f"{peer[0]}:{peer[1]}"
+
+        # Initialize follower tracking state
+        if peer not in self.next_index:
+            self.next_index[peer] = len(self.log)
+            self.match_index[peer] = 0
+        
+        if self.match_index.get(peer, 0) >= len(self.log):
+            # Instead of returning silently, send a simple heartbeat
+            try:
+                async with grpc.aio.insecure_channel(peer) as channel:
+                    stub = train_booking_pb2_grpc.RaftStub(channel)
+                    prev_log_index = len(self.log)
+                    prev_log_term = self.log[-1].term if self.log else 0
+
+                    req = train_booking_pb2.AppendEntriesRequest(
+                        term=self.current_term,
+                        leader_id=self.node_id,
+                        prev_log_index=prev_log_index,
+                        prev_log_term=prev_log_term,
+                        entries=[],
+                        leader_commit=self.commit_index
+                    )
+
+                    await stub.AppendEntries(req)
+            except Exception:
+                print(f"[{self.node_id}] Heartbeat to {peer} failed (peer down?)")
+            return
+
+        max_retries = 10
+        retries = 0
+
+        while retries < max_retries:
+            next_idx = max(0, min(self.next_index.get(peer, len(self.log)), len(self.log)))
+            prev_idx = max(0, next_idx - 1)
+
+            # Correct prev_term computation (0-based)
+            prev_term = self.log[prev_idx].term if prev_idx < len(self.log) and prev_idx > 0 else 0
+
+            # Determine entries to send
+            entries_to_send = self.log[next_idx:] if next_idx < len(self.log) else []
+
+            try:
+                async with grpc.aio.insecure_channel(peer) as channel:
+                    stub = train_booking_pb2_grpc.RaftStub(channel)
+
+                    req = train_booking_pb2.AppendEntriesRequest(
+                        term=self.current_term,
+                        leader_id=self.node_id,
+                        prev_log_index=prev_idx,
+                        prev_log_term=prev_term,
+                        entries=[
+                            train_booking_pb2.LogEntry(command=e.command, term=e.term)
+                            for e in entries_to_send
+                        ],
+                        leader_commit=self.commit_index,
+                    )
+
+                    resp = await stub.AppendEntries(req)
+
+                    # Successful append
+                    if getattr(resp, "success", False):
+                        self.match_index[peer] = len(self.log)
+                        self.next_index[peer] = len(self.log)
+                        print(f"[{self.node_id}] {peer} caught up successfully.")
+                        return
+
+                    # Follower rejected — decrement next_index and retry
+                    self.next_index[peer] = max(0, self.next_index.get(peer, len(self.log)) - 1)
+                    retries += 1
+                    print(
+                        f"[{self.node_id}] {peer} log mismatch, backoff next_index={self.next_index[peer]} (retry {retries})"
+                    )
+
+                    # Small delay to avoid spamming
+                    await asyncio.sleep(0.2)
+
+            except Exception:
+                print(f"[{self.node_id}] Replication to {peer} failed (peer down?)")
+                return
+
+        print(f"[{self.node_id}] {peer} failed to catch up after {max_retries} retries.")
 
     async def append_entries_to_peer(self, peer, entries=None, start_index=None):
         """
@@ -301,7 +402,7 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
                 success_count += 1
 
         # Check majority
-        if success_count > (len(self.peers) + 1) // 2:
+        if success_count >= (len(self.peers) + 1) // 2:
             # commit this entry (number of entries committed = len(self.log))
             self.commit_index = len(self.log)
             print(f"[{self.node_id}] Log entry committed: {command}")
@@ -326,16 +427,28 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
 
         # Apply entries from last_applied (count) up to commit_index (count)
         if self.applying:
+            # already running in background; don't start again
             return
+
         self.applying = True
-        async with self.apply_lock:
-            try:
+        try:
+            async with self.apply_lock:
                 while self.last_applied < self.commit_index:
                     entry = self.log[self.last_applied]
-                    await self.apply_log_entry(entry)
-                    self.last_applied += 1
-            finally:
-                self.applying = False
+                    try:
+                        await self.apply_log_entry(entry)
+                        self.last_applied += 1
+                    except Exception as e:
+                        # retry safely if SQLite is busy
+                        if "database is locked" in str(e).lower():
+                            print(f"[{self.node_id}] SQLite busy, retrying in 0.2s...")
+                            await asyncio.sleep(0.2)
+                            continue
+                        print(f"[{self.node_id}] Failed to apply log entry: {e}")
+                        break
+                    await asyncio.sleep(0.05)  # small yield to let asyncio breathe
+        finally:
+            self.applying = False
 
     async def apply_log_entry(self, log_entry):
         """

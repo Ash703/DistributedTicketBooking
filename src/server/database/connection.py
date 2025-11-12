@@ -8,8 +8,11 @@ from utils import config
 # Database Initialization
 async def get_db_connection():
     """Establishes a connection to the database, enabling foreign key support."""
-    conn = await aiosqlite.connect(config.DB_NAME)
+    conn = await aiosqlite.connect(config.DB_NAME, timeout=15)
     await conn.execute("PRAGMA foreign_keys = ON") 
+    await conn.execute("PRAGMA journal_mode = WAL;")
+    await conn.execute("PRAGMA synchronous = NORMAL;")
+    await conn.execute("PRAGMA busy_timeout = 3000;")  # wait 3 seconds if locked
     conn.row_factory = aiosqlite.Row
     return conn
 
