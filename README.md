@@ -20,6 +20,8 @@ Run compile_proto.ps1 / compile_proto.sh after each changes to proto file
 ## Client: 
 `python src/client/command_line_main.py`
 
+## Flask App:
+`python web_app/app.py`
 
 [Database Viewer](https://sqliteviewer.app/)
 

@@ -9,31 +9,54 @@ from utils import config
 async def serve(node_id, port, peers):
     """
     Starts the async gRPC server and waits for requests.
+    Includes graceful shutdown logic.
     """
     config.DB_NAME = f"Node{node_id}" + config.DB_NAME
-    await db_connection.init_db()  # async DB initialization
+    await db_connection.init_db() 
 
     raft_node = RaftNode(node_id=node_id, peers=peers)
 
     server = grpc.aio.server()  # Async gRPC server
     train_booking_pb2_grpc.add_TicketingServicer_to_server(BookingService(raft_node), server)
-
     train_booking_pb2_grpc.add_RaftServicer_to_server(raft_node, server)
-    await raft_node.start()
 
     server.add_insecure_port(f'[::]:{port}')
 
-    print("Starting async gRPC server on port 50051...")
+    print(f"Starting async gRPC server on port {port}...")
     await server.start()
 
-    print("Server started successfully on port 50051.")
+    print(f"Server started successfully on port {port}.")
+    
+    # Start the Raft node's main loop as a background task
+    # This assumes raft_node.start() is the long-running async function
+    raft_task = asyncio.create_task(raft_node.start())
+    print(f"Node {node_id} Raft protocol task started.")
+
     try:
-        # Wait indefinitely
+        # This will wait indefinitely until the server is shut down
         await server.wait_for_termination()
-    except KeyboardInterrupt:
-        print("Server shutting down...")
-        await server.stop(0)
-        print("Server stopped.")
+        
+    except asyncio.CancelledError:
+        # This exception is raised when asyncio.run() catches the KeyboardInterrupt
+        print(f"\nShutdown signal (CancelledError) received on node {node_id}...")
+        
+    finally:
+        # This block will run regardless of how the try block exited,
+        # ensuring a clean shutdown.
+        
+        print("Stopping gRPC server...")
+        # Gracefully stop the server, waiting 1 second for calls to finish
+        await server.stop(1)
+        
+        # Cancel and clean up the background Raft task
+        if not raft_task.done():
+            raft_task.cancel()
+            try:
+                await raft_task # Await the cancellation to complete
+            except asyncio.CancelledError:
+                pass # This is expected when cancelling
+        
+        print(f"Node {node_id} server and Raft task stopped.")
 
 
 if __name__ == '__main__':
@@ -48,4 +71,10 @@ if __name__ == '__main__':
     current = next(n for n in nodes if n["id"] == node_id)
     peers = [(f"localhost", n["port"]) for n in nodes if n["id"] != node_id]
 
-    asyncio.run(serve(current["id"], current["port"], peers))
+    try:
+        # asyncio.run() will catch the KeyboardInterrupt and
+        # correctly trigger the CancelledError inside serve()
+        asyncio.run(serve(current["id"], current["port"], peers))
+    except KeyboardInterrupt:
+        # This block will run after serve() has already cleaned up
+        print(f"\nNode {current['id']} main process exiting...")

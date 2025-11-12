@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Train Booking</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; background-color: #f4f7f6; color: #333; }
+        #container { max-width: 900px; margin: 20px auto; padding: 20px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h1, h2 { border-bottom: 2px solid #eee; padding-bottom: 5px; color: #0056b3; }
+        .auth-forms { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+        .form-section { flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        input, select, button { font-size: 14px; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; width: 100%; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        button.secondary { background-color: #6c757d; }
+        button.secondary:hover { background-color: #5a6268; }
+        .hidden { display: none; }
+        .loading { color: #888; }
+        .error { color: #d9534f; font-weight: bold; }
+        .success { color: #28a745; font-weight: bold; }
+        #user-status { background-color: #e6f7ff; border: 1px solid #b3e0ff; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        #user-status button { width: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        td button { width: auto; font-size: 12px; padding: 5px 10px; }
+        
+        /* Chatbot Styles */
+        #chat-container { border: 1px solid #ccc; border-radius: 8px; margin-top: 20px; }
+        #chat-messages { height: 200px; overflow-y: scroll; padding: 10px; background: #fdfdfd; }
+        #chat-messages div { margin-bottom: 10px; }
+        #chat-messages .user { text-align: right; color: #0056b3; }
+        #chat-messages .bot { text-align: left; color: #333; }
+        #chat-form { display: flex; border-top: 1px solid #ccc; }
+        #chat-form input { flex: 1; border: none; margin: 0; border-radius: 0 0 0 8px; }
+        #chat-form button { width: auto; border-radius: 0 0 8px 0; margin: 0; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Distributed Train Booking System</h1>
+
+        <div id="user-status">
+            <span id="user-greeting">You are not logged in.</span>
+            <button id="logout-button" class="secondary hidden">Logout</button>
+        </div>
+
+        <div id="auth-section">
+            <div class="auth-forms">
+                <div class="form-section">
+                    <h2>Login</h2>
+                    <form id="login-form">
+                        <input type="text" id="login-username" placeholder="Username (e.g., customer / admin)" required>
+                        <input type="password" id="login-password" placeholder="Password (e.g., cust123 / admin123)" required>
+                        <button type="submit">Login</button>
+                    </form>
+                </div>
+                <div class="form-section">
+                    <h2>Register</h2>
+                    <form id="register-form">
+                        <input type="text" id="register-username" placeholder="New Username" required>
+                        <input type="password" id="register-password" placeholder="New Password" required>
+                        <button type="submit">Register</button>
+                    </form>
+                </div>
+            </div>
+            <p id="auth-message"></p>
+        </div>
+
+        <div id="customer-app" class="hidden">
+            <div class="search-section">
+                <h2>Search for Trains</h2>
+                <form id="search-form">
+                    <select id="search-from" required><option value="">Loading cities...</option></select>
+                    <select id="search-to" required><option value="">Loading cities...</option></select>
+                    <input type="date" id="search-date" required>
+                    <button type="submit">Search</button>
+                </form>
+                <div id="search-results"></div>
+            </div>
+            
+            <div class="bookings-section">
+                <h2>My Bookings</h2>
+                <button id="view-bookings-button">View My Bookings</button>
+                <div id="bookings-list"></div>
+            </div>
+            
+            <div class="chatbot-section">
+                <h2>Chatbot</h2>
+                <div id="chat-container">
+                    <div id="chat-messages"></div>
+                    <form id="chat-form">
+                        <input type="text" id="chat-input" placeholder="Ask about your bookings..." required>
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="admin-app" class="hidden">
+            <h2>Admin Panel</h2>
+            <div id="admin-message" style="margin-bottom: 15px;"></div>
+            
+            <div class="form-section">
+                <h3>Add New Train Route</h3>
+                <form id="add-train-form">
+                    <input type="number" id="admin-train-num" placeholder="Train Number (e.g., 12951)" required>
+                    <input type="text" id="admin-train-name" placeholder="Train Name (e.g., Mumbai Rajdhani)" required>
+                    <select id="admin-from-city" required><option value="">Select Departure City...</option></select>
+                    <select id="admin-to-city" required><option value="">Select Destination City...</option></select>
+                    <select id="admin-train-type" required>
+                        <option value="">Select Train Type...</option>
+                        <option value="Express">Express</option>
+                        <option value="Superfast">Superfast</option>
+                        <option value="Rajdhani">Rajdhani</option>
+                        <option value="Duronto">Duronto</option>
+                        <option value="Shatabdi">Shatabdi</option>
+                        <option value="Garib Rath">Garib Rath</option>
+                        <option value="Special">Special</option>
+                        <option value="Mail">Mail</option>
+                    </select>
+                    <button type="submit">Add Train</button>
+                </form>
+            </div>
+            
+            <div class="form-section" style="margin-top: 20px;">
+                <h3>Add New Train Service (Schedule)</h3>
+                <form id="add-service-form">
+                    <input type="number" id="admin-service-train-num" placeholder="Train Number (must exist)" required>
+                    <input type="text" id="admin-service-departure" placeholder="Departure (YYYY-MM-DD HH:MM:SS)" required>
+                    <input type="text" id="admin-service-arrival" placeholder="Arrival (YYYY-MM-DD HH:MM:SS)" required>
+                    
+                    <h4>Seat Classes (add at least one)</h4>
+                    <div id="admin-seat-info-container">
+                        </div>
+                    <button type="button" class="secondary" id="add-seat-class-btn">Add Seat Class</button>
+                    <hr>
+                    <button type="submit">Add Service Schedule</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- App State ---
+        const state = {
+            token: null,
+            role: null,
+            username: null,
+            cities: []
+        };
+
+        // --- DOM Elements ---
+        const userGreeting = document.getElementById('user-greeting');
+        const logoutButton = document.getElementById('logout-button');
+        const authSection = document.getElementById('auth-section');
+        const customerApp = document.getElementById('customer-app');
+        const adminApp = document.getElementById('admin-app');
+        const authMessage = document.getElementById('auth-message');
+        const searchFormEl = document.getElementById('search-form');
+        const viewBookingsBtn = document.getElementById('view-bookings-button');
+        const chatForm = document.getElementById('chat-form');
+        
+        // --- DOM Elements (Admin) ---
+        const adminMessage = document.getElementById('admin-message');
+        const addTrainForm = document.getElementById('add-train-form');
+        const addServiceForm = document.getElementById('add-service-form');
+
+        // --- Event Handlers ---
+
+        // Register
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('register-username').value;
+            const password = document.getElementById('register-password').value;
+            
+            const resp = await apiFetch('/api/register', { username, password });
+            
+            if (resp.success) {
+                authMessage.className = 'success';
+                authMessage.textContent = 'Registration successful! Please log in.';
+                e.target.reset();
+            } else {
+                authMessage.className = 'error';
+                authMessage.textContent = `Registration Failed: ${resp.message}`;
+            }
+        });
+
+        // Login
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            const resp = await apiFetch('/api/login', { username, password });
+            
+            if (resp.success && resp.token) {
+                sessionStorage.setItem('authToken', resp.token);
+                sessionStorage.setItem('authRole', resp.role);
+                sessionStorage.setItem('authUsername', username);
+                authMessage.textContent = '';
+                await checkLoginState();
+            } else {
+                authMessage.className = 'error';
+                authMessage.textContent = `Login Failed: ${resp.message}`;
+            }
+        });
+
+        // Logout
+        logoutButton.addEventListener('click', () => {
+            sessionStorage.clear();
+            checkLoginState();
+        });
+
+        // Search
+        searchFormEl.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultsEl = document.getElementById('search-results');
+            resultsEl.innerHTML = '<p class="loading">Searching...</p>';
+            
+            const resp = await apiFetch('/api/search', {
+                source_city_id: document.getElementById('search-from').value,
+                destination_city_id: document.getElementById('search-to').value,
+                date: document.getElementById('search-date').value
+            });
+            
+            if (!resp || resp.length === 0) {
+                resultsEl.innerHTML = '<p>No services found for this route and date.</p>';
+                return;
+            }
+            
+            let table = '<table><tr><th>Train</th><th>Departs</th><th>Arrives</th><th>Class</th><th>Price</th><th>Action</th></tr>';
+            resp.forEach(s => {
+                table += `
+                    <tr>
+                        <td>${s.train_name}</td>
+                        <td>${s.datetime_of_departure}</td>
+                        <td>${s.datetime_of_arrival}</td>
+                        <td>${s.seat_type} (${s.seats_available} left)</td>
+                        <td>${s.price.toFixed(2)}</td>
+                        <td><button class="secondary" onclick="initiateBooking('${s.service_id}')">Book</button></td>
+                    </tr>
+                `;
+            });
+            table += '</table>';
+            resultsEl.innerHTML = table;
+        });
+
+        // View My Bookings
+        viewBookingsBtn.addEventListener('click', async () => {
+            const listEl = document.getElementById('bookings-list');
+            listEl.innerHTML = '<p class="loading">Loading your bookings...</p>';
+            
+            const resp = await apiFetch('/api/my_bookings', { token: state.token });
+            
+            if (!resp || resp.length === 0) {
+                listEl.innerHTML = '<p>You have no bookings.</p>';
+                return;
+            }
+            
+            let table = '<table><tr><th>Booking ID</th><th>Train</th><th>From</th><th>To</th><th>Date</th><th>Seats</th><th>Cost</th><th>Status</th></tr>';
+            resp.forEach(b => {
+                table += `
+                    <tr>
+                        <td>${b.booking_id.substring(0, 8)}...</td>
+                        <td>${b.train_name}</td>
+                        <td>${b.source}</td>
+                        <td>${b.destination}</td>
+                        <td>${b.datetime_of_departure}</td>
+                        <td>${b.number_of_seats}</td>
+                        <td>${b.total_cost.toFixed(2)}</td>
+                        <td>${b.status}</td>
+                    </tr>
+                `;
+            });
+            table += '</table>';
+            listEl.innerHTML = table;
+        });
+
+        // Chatbot
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = chatInput.value;
+            if (!query) return;
+            
+            addChatMessage('user', query);
+            chatInput.value = '';
+            
+            startChatStream(query);
+        });
+        
+        function addChatMessage(role, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = role;
+            msgDiv.textContent = text;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // --- NEW: Admin Event Handlers ---
+        
+        // Handle Add Train
+        addTrainForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            adminMessage.className = 'loading';
+            adminMessage.textContent = 'Adding train...';
+            
+            const resp = await apiFetch('/api/admin/add_train', {
+                token: state.token,
+                train_number: document.getElementById('admin-train-num').value,
+                train_name: document.getElementById('admin-train-name').value,
+                source_city_id: document.getElementById('admin-from-city').value,
+                destination_city_id: document.getElementById('admin-to-city').value,
+                train_type: document.getElementById('admin-train-type').value
+            });
+            
+            if (resp.success) {
+                adminMessage.className = 'success';
+                adminMessage.textContent = resp.message;
+                addTrainForm.reset();
+            } else {
+                adminMessage.className = 'error';
+                adminMessage.textContent = `Failed: ${resp.message}`;
+            }
+        });
+
+        // Handle Add Service (with dynamic seat classes)
+        document.getElementById('add-seat-class-btn').addEventListener('click', () => {
+            const container = document.getElementById('admin-seat-info-container');
+            const seatBlock = document.createElement('div');
+            seatBlock.className = 'seat-class-entry';
+            seatBlock.style = 'display:flex; gap: 5px; border: 1px solid #eee; padding: 5px; margin-bottom: 5px;';
+            seatBlock.innerHTML = `
+                <select class="admin-seat-type" required>
+                    <option value="AC1">AC1</option>
+                    <option value="AC2">AC2</option>
+                    <option value="AC3">AC3</option>
+                    <option value="GENERAL">GENERAL</option>
+                </select>
+                <input type="number" class="admin-seat-count" placeholder="Seats" style="width: 80px;" required>
+                <input type="number" class="admin-seat-price" placeholder="Price" style="width: 80px;" required>
+            `;
+            container.appendChild(seatBlock);
+        });
+
+        addServiceForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            adminMessage.className = 'loading';
+            adminMessage.textContent = 'Adding service...';
+            
+            const seatInfoList = [];
+            document.querySelectorAll('.seat-class-entry').forEach(block => {
+                seatInfoList.push({
+                    seat_type: block.querySelector('.admin-seat-type').value,
+                    seats_available: block.querySelector('.admin-seat-count').value,
+                    price: block.querySelector('.admin-seat-price').value
+                });
+            });
+
+            if (seatInfoList.length === 0) {
+                adminMessage.className = 'error';
+                adminMessage.textContent = 'You must add at least one seat class.';
+                return;
+            }
+
+            const resp = await apiFetch('/api/admin/add_service', {
+                token: state.token,
+                train_number: document.getElementById('admin-service-train-num').value,
+                datetime_of_departure: document.getElementById('admin-service-departure').value,
+                datetime_of_arrival: document.getElementById('admin-service-arrival').value,
+                seat_info: seatInfoList
+            });
+
+            if (resp.success) {
+                adminMessage.className = 'success';
+                adminMessage.textContent = resp.message;
+                addServiceForm.reset();
+                document.getElementById('admin-seat-info-container').innerHTML = '';
+            } else {
+                adminMessage.className = 'error';
+                adminMessage.textContent = `Failed: ${resp.message}`;
+            }
+        });
+
+
+        // --- Core Functions ---
+
+        async function checkLoginState() {
+            state.token = sessionStorage.getItem('authToken');
+            state.role = sessionStorage.getItem('authRole');
+            state.username = sessionStorage.getItem('authUsername');
+            
+            if (state.token && state.role) {
+                userGreeting.textContent = `Welcome, ${state.username} (${state.role})`;
+                logoutButton.classList.remove('hidden');
+                authSection.classList.add('hidden');
+                
+                if (state.role === 'CUSTOMER') {
+                    customerApp.classList.remove('hidden');
+                    adminApp.classList.add('hidden');
+                    await loadCities();
+                } else if (state.role === 'ADMIN') {
+                    customerApp.classList.add('hidden');
+                    adminApp.classList.remove('hidden');
+                    await loadCities(); // Admin needs cities too
+                }
+            } else {
+                userGreeting.textContent = 'You are not logged in.';
+                logoutButton.classList.add('hidden');
+                authSection.classList.remove('hidden');
+                customerApp.classList.add('hidden');
+                adminApp.classList.add('hidden');
+            }
+        }
+
+        async function loadCities() {
+            const resp = await apiFetch('/api/cities');
+            if (resp) {
+                state.cities = resp;
+                
+                // Customer search dropdowns
+                const fromSelect = document.getElementById('search-from');
+                const toSelect = document.getElementById('search-to');
+                
+                // Admin form dropdowns
+                const adminFromSelect = document.getElementById('admin-from-city');
+                const adminToSelect = document.getElementById('admin-to-city');
+
+                // Clear all
+                fromSelect.innerHTML = '<option value="">Select Departure City...</option>';
+                toSelect.innerHTML = '<option value="">Select Destination City...</option>';
+                adminFromSelect.innerHTML = '<option value="">Select Departure City...</option>';
+                adminToSelect.innerHTML = '<option value="">Select Destination City...</option>';
+                
+                state.cities.forEach(city => {
+                    let option = new Option(`${city.city_name} (${city.city_code})`, city.city_id);
+                    fromSelect.add(option.cloneNode(true));
+                    toSelect.add(option.cloneNode(true));
+                    adminFromSelect.add(option.cloneNode(true));
+                    adminToSelect.add(option.cloneNode(true));
+                });
+            }
+        }
+        
+        async function apiFetch(endpoint, body) {
+            try {
+                const options = {
+                    method: body ? 'POST' : 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body ? JSON.stringify(body) : null
+                };
+                const response = await fetch(endpoint, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (err) {
+                console.error(`Fetch error for ${endpoint}:`, err);
+                return null;
+            }
+        }
+
+        async function initiateBooking(serviceId) {
+            const numSeats = prompt("How many seats to book?", "1");
+            if (!numSeats || isNaN(parseInt(numSeats)) || parseInt(numSeats) <= 0) {
+                alert("Invalid number of seats.");
+                return;
+            }
+            
+            // 1. Initiate Booking
+            const initResp = await apiFetch('/api/initiate_booking', {
+                token: state.token,
+                service_id: serviceId,
+                num_seats: parseInt(numSeats)
+            });
+            
+            if (!initResp.success) {
+                alert(`Booking Failed: ${initResp.message}`);
+                return;
+            }
+            
+            // 2. Confirm and Process Payment
+            const confirmPayment = confirm(`Seats reserved! Total cost: ${initResp.total_cost.toFixed(2)}. Proceed to payment?`);
+            if (!confirmPayment) {
+                alert("Booking cancelled.");
+                return;
+            }
+            
+            const payResp = await apiFetch('/api/process_payment', {
+                token: state.token,
+                booking_id: initResp.booking_id,
+                payment_mode: "WebClientPay"
+            });
+            
+            alert(payResp.message);
+            viewBookingsBtn.click(); // Refresh bookings
+        }
+        
+        async function startChatStream(query) {
+            const botMsgDiv = document.createElement('div');
+            botMsgDiv.className = 'bot';
+            botMsgDiv.textContent = '...';
+            chatMessages.appendChild(botMsgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/api/ask_bot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ token: state.token, query: query })
+                });
+
+                if (!response.ok) {
+                    botMsgDiv.textContent = "Error connecting to bot.";
+                    return;
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = "";
+                
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataChunk = line.substring(6);
+                            if (dataChunk === '[STREAM_END]') {
+                                return; // All done
+                            }
+                            try {
+                                const jsonData = JSON.parse(dataChunk);
+                                if (fullResponse === '...') fullResponse = ""; // Clear "..."
+                                fullResponse += jsonData.answer;
+                                botMsgDiv.textContent = fullResponse;
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            } catch (e) {
+                                // Incomplete JSON chunk, wait for next read
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                botMsgDiv.textContent = `Error: ${err.message}`;
+            }
+        }
+
+        // --- Initial Page Load ---
+        checkLoginState();
+    </script>
+</body>
+</html>
