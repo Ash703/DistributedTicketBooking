@@ -4,7 +4,7 @@ import train_booking_pb2
 import train_booking_pb2_grpc
 import time
 import json
-
+import uuid
 from database import models as db_models
 from utils import security as security_utils
 from utils import config
@@ -218,44 +218,43 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not user or user['role'] != 'CUSTOMER':
             return train_booking_pb2.BookingConfirmation(success=False, message="Unauthorized")
 
-        # --- REMOVED DIRECT WRITE ---
-        # success, message, booking_id, total_cost = await db_models.initiate_booking_tx(...)
-        # ----------------------------
-
-        # Note: We can't get the booking_id/cost from the DB yet because we haven't written it.
-        # We must rely on the return value from Raft.
+        # --- 1. READ ONLY CHECK ---
+        # We check availability and get price, but we DO NOT write to DB yet.
+        service = await db_models.get_service_price(request.service_id)
         
+        if not service:
+            return train_booking_pb2.BookingConfirmation(success=False, message="Service not found.")
+        
+        if service['seats_available'] < request.number_of_seats:
+            return train_booking_pb2.BookingConfirmation(success=False, message="Not enough seats available.")
+
+        # --- 2. PREPARE DATA ---
+        # Generate ID and Cost here so it is deterministic for all Raft nodes
+        booking_id = str(uuid.uuid4())
+        total_cost = float(service['price']) * request.number_of_seats
+
+        # --- 3. SEND TO RAFT ---
         command_data = {
             "action": "BOOK_SEATS",
             "user_id": user['user_id'],
             "service_id": request.service_id,
             "number_of_seats": request.number_of_seats,
-            # We don't pass booking_id here, let the Raft apply logic generate it 
-            # OR we generate it here to ensure all nodes get the same ID.
-            # Generating it here is safer for consistency.
-            "booking_id": security_utils.generate_token()[:8] # simple deterministic ID for now
+            "booking_id": booking_id, # We dictate the ID
+            "total_cost": total_cost  # We dictate the Cost
         }
         command = json.dumps(command_data)
         
-        # Raft handle_client_command now returns the result of apply_log_entry
-        # We need apply_log_entry to return "booking_id,total_cost"
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
-            return train_booking_pb2.BookingConfirmation(success=False, message=raft_msg)
+            return train_booking_pb2.BookingConfirmation(success=False, message=raft_msg, booking_id="", total_cost=0.0)
         
-        # Parse the result from Raft
-        try:
-            # Assuming apply_log_entry returns "booking_id,total_cost"
-            booking_id, total_cost_str = raft_msg.split(',')
-            return train_booking_pb2.BookingConfirmation(
-                success=True,
-                message="Booking initiated.",
-                booking_id=booking_id,
-                total_cost=float(total_cost_str)
-            )
-        except Exception:
-             return train_booking_pb2.BookingConfirmation(success=True, message=raft_msg, booking_id="unknown", total_cost=0.0)
+        return train_booking_pb2.BookingConfirmation(
+            success=True,
+            message="Booking initiated. Please pay.",
+            booking_id=booking_id,
+            total_cost=total_cost
+        )
 
     async def ProcessPayment(self, request, context):
         print(f"Request to process payment for booking_id: {request.booking_id}")
@@ -271,10 +270,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                 message=f"This node is not the leader. Please contact leader {leader}."
             )
         
-        # --- REMOVED DIRECT WRITE ---
-        # success, message = await db_models.confirm_payment_tx(...)
-        # ----------------------------
-
+        
         command_data = {
             "action": "CONFIRM_PAYMENT",
             "booking_id": request.booking_id,
