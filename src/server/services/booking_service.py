@@ -1,26 +1,19 @@
-import time
+import asyncio
 import grpc
 import train_booking_pb2
 import train_booking_pb2_grpc
+import time
+import json
+
 from database import models as db_models
 from utils import security as security_utils
 from utils import config
-from openai import AsyncOpenAI
-import asyncio
 
 class BookingService(train_booking_pb2_grpc.TicketingServicer):
-    """Implements the gRPC service for the booking application."""
+
     def __init__(self, raft_node):
         self.raft = raft_node
-        try:
-            self.client = AsyncOpenAI(
-            base_url="http://127.0.0.1:50390",  #local llm url
-            api_key="not-needed"
-            )
-        except:
-            print("ChatBot is not available.")
-            pass
-    
+
     async def Register(self, request, context):
         print(f"Registration attempt for username: {request.username}")
         
@@ -41,7 +34,14 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not success:
             return train_booking_pb2.StatusResponse(success=False, message="Username already exists.")
         
-        command = f"REGISTER:{request.username},{hashed_password.decode('utf-8')},CUSTOMER"
+        command_data = {
+            "action": "REGISTER",
+            "username": request.username,
+            "hashed_password": hashed_password.decode('utf-8'),
+            "role": "CUSTOMER"
+        }
+        command = json.dumps(command_data)
+
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
@@ -54,7 +54,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
 
         if self.raft.state != "leader":
             leader = self.raft.leader_id or "unknown"
-            return train_booking_pb2.StatusResponse(
+            return train_booking_pb2.LoginResponse(
                 success=False,
                 message=f"This node is not the leader. Please contact leader {leader}."
             )
@@ -72,15 +72,21 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         
         await db_models.create_session(user['user_id'], token, expires_at)
 
-        # Propose a Raft entry for session creation
-        command = f"CREATE_SESSION:{user['user_id']},{token},{expires_at}"
+        command_data = {
+            "action": "CREATE_SESSION",
+            "user_id": user['user_id'],
+            "token": token,
+            "expires_at": expires_at
+        }
+        command = json.dumps(command_data)
+        
         raft_success, raft_msg = await self.raft.handle_client_command(command)
         
         if not raft_success:
             return train_booking_pb2.LoginResponse(success=False, message=raft_msg)
 
         print(f"Login successful for {request.username}.")
-        return train_booking_pb2.LoginResponse(success=True, message="Login successful.", token=token)
+        return train_booking_pb2.LoginResponse(success=True, message="Login successful.", token=token, role=train_booking_pb2.Role.Value(user['role']))
     
     async def AddTrain(self, request, context):
         print(f"Request to add new train: {request.train_number}")
@@ -107,7 +113,16 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not success:
             return train_booking_pb2.StatusResponse(success=False, message="Train number already exists.")
         
-        command = f"ADD_TRAIN:{request.train_number},{request.train_name},{request.source_city_id},{request.destination_city_id},{request.train_type}"
+        command_data = {
+            "action": "ADD_TRAIN",
+            "train_number": request.train_number,
+            "train_name": request.train_name,
+            "source_city_id": request.source_city_id,
+            "destination_city_id": request.destination_city_id,
+            "train_type": request.train_type
+        }
+        command = json.dumps(command_data)
+        
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
@@ -117,7 +132,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
 
     async def AddTrainService(self, request, context):
         print(f"Request to add new service for train: {request.train_number}")
-
 
         admin_user = await db_models.get_user_by_token(request.admin_token)
         if not admin_user or admin_user['role'] != 'ADMIN':
@@ -146,7 +160,15 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not success:
             return train_booking_pb2.StatusResponse(success=False, message="Failed to add train services.")
 
-        command = f"ADD_SERVICE:{request.train_number},{request.datetime_of_departure},{request.datetime_of_arrival}," + "|".join(seat_info_list)
+        command_data = {
+            "action": "ADD_SERVICE",
+            "train_number": request.train_number,
+            "datetime_of_departure": request.datetime_of_departure,
+            "datetime_of_arrival": request.datetime_of_arrival,
+            "seat_info": seat_info_list
+        }
+        command = json.dumps(command_data)
+        
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
@@ -155,10 +177,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         return train_booking_pb2.StatusResponse(success=True, message="Train services added successfully.")
     
     async def SearchTrainServices(self, request, context):
-        """
-        Handles a customer's request to search for available train services.
-        """
-        
         print(f"Request to search for trains from city ID {request.source_city_id} to {request.destination_city_id} on {request.date}")
         
         try: 
@@ -175,6 +193,8 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                 summary.service_id = service_row['service_id']
                 summary.train_number = service_row['train_number']
                 summary.train_name = service_row['train_name']
+                summary.source_city_name = service_row['source_city_name']
+                summary.destination_city_name = service_row['destination_city_name']
                 summary.datetime_of_departure = service_row['datetime_of_departure']
                 summary.datetime_of_arrival = service_row['datetime_of_arrival']
                 summary.seat_type = train_booking_pb2.SeatType.Value(service_row['seat_type'])
@@ -195,10 +215,10 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
 
         if self.raft.state != "leader":
             leader = self.raft.leader_id or "unknown"
-            return train_booking_pb2.StatusResponse(
+            return train_booking_pb2.BookingConfirmation(
                 success=False,
                 message=f"This node is not the leader. Please contact leader {leader}."
-        )
+            )
         
         user = await db_models.get_user_by_token(request.customer_token)
         if not user or user['role'] != 'CUSTOMER':
@@ -213,7 +233,16 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not success:
             return train_booking_pb2.BookingConfirmation(success=False, message=message, booking_id=booking_id or "", total_cost=total_cost or 0.0)
 
-        command = f"BOOK_SEATS:{user['user_id']},{request.service_id},{request.number_of_seats}"
+        command_data = {
+            "action": "BOOK_SEATS",
+            "user_id": user['user_id'],
+            "service_id": request.service_id,
+            "number_of_seats": request.number_of_seats,
+            "booking_id": booking_id,
+            "total_cost": total_cost
+        }
+        command = json.dumps(command_data)
+        
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
@@ -238,21 +267,54 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             return train_booking_pb2.StatusResponse(
                 success=False,
                 message=f"This node is not the leader. Please contact leader {leader}."
-        )
+            )
         
         success, message = await db_models.confirm_payment_tx(request.booking_id, request.payment_mode)
 
         if not success:
             return train_booking_pb2.StatusResponse(success=False, message=message)
 
-        command = f"CONFIRM_PAYMENT:{request.booking_id},{request.payment_mode}"
+        command_data = {
+            "action": "CONFIRM_PAYMENT",
+            "booking_id": request.booking_id,
+            "payment_mode": request.payment_mode
+        }
+        command = json.dumps(command_data)
+        
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
             return train_booking_pb2.StatusResponse(success=False, message=raft_msg)
 
         return train_booking_pb2.StatusResponse(success=True, message="Payment processed successfully.")
+    
+    async def GetMyBookings(self, request, context):
+        print(f"Request to get bookings for token {request.customer_token[:8]}...")
+
+        user = await db_models.get_user_by_token(request.customer_token)
+        if not user:
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid or expired token.")
+            return train_booking_pb2.BookingList()
+
+        user_bookings = await db_models.get_bookings_by_user_id(user['user_id'])
         
+        response = train_booking_pb2.BookingList()
+        for row in user_bookings:
+            booking_details = response.bookings.add()
+            booking_details.booking_id = row['booking_id']
+            booking_details.train_name = row['train_name']
+            booking_details.source = row['source'] 
+            booking_details.destination = row['destination']
+            booking_details.datetime_of_departure = row['datetime_of_departure']
+            booking_details.number_of_seats = row['number_of_seats']
+            booking_details.total_cost = row['total_cost']
+            booking_details.seat_type = train_booking_pb2.SeatType.Value(row['seat_type'])
+            booking_details.status = row['status']
+
+        print(f"Found {len(user_bookings)} bookings for user '{user['username']}'.")
+        return response
+
     async def ListCities(self, request, context):
         print("Request to list all cities")
         cities_from_db = await db_models.get_all_cities()
@@ -263,80 +325,3 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             city_proto.city_name = city_row['city_name']
             city_proto.city_code = city_row['city_code']
         return response
-    
-    async def GetMyBookings(self, request, context):
-        print(f"Request to get bookings for token {request.customer_token[:8]}...")
-
-        user = await db_models.get_user_by_token(request.customer_token)
-        if not user:
-            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
-            context.set_details("Invalid or expired token.")
-            return train_booking_pb2.BookingList()
-        
-        user_bookings = await db_models.get_bookings_by_user_id(user['user_id'])
-        
-        response = train_booking_pb2.BookingList()
-        for row in user_bookings:
-            booking_details = response.bookings.add()
-            booking_details.booking_id = row['booking_id']
-            booking_details.train_name = row['train_name']
-            booking_details.source = row['source']
-            booking_details.destination = row['destination']
-            booking_details.datetime_of_departure = row['datetime_of_departure']
-            booking_details.number_of_seats = row['number_of_seats']
-            booking_details.total_cost = row['total_cost']
-            booking_details.seat_type = train_booking_pb2.SeatType.Value(row['seat_type'])
-            booking_details.status = row['status']
-            
-        print(f"Found {len(user_bookings)} bookings for user '{user['username']}'.")
-        return response
-
-    async def AskBot(self, request, context):
-        
-        user = await db_models.get_user_by_token(request.customer_token)
-        if not user:
-            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
-            context.set_details("Invalid or expired token.")
-            yield train_booking_pb2.LLMAnswer(answer="Unauthorized.")
-            return
-        
-        user_bookings = await db_models.get_bookings_by_user_id(user['user_id'])
-        
-        context_text = "The user has the following bookings: "
-        if not user_bookings:
-            context_text = "The user currently has no confirmed bookings."
-        else:
-            for booking in user_bookings:
-                context_text += (
-                    f"A booking for the '{booking['train_name']}' train. "
-                    f"It departs from '{booking['source']}' and goes to '{booking['destination']}' "
-                    f"on {booking['datetime_of_departure']}. "
-                    f"The status is {booking['status']}. "
-                )
-        system_prompt = (
-        f"You are a train booking assistant for user ID {user['user_id']}."
-        f"You MUST ONLY answer questions related to train bookings or schedules."
-        f"Your knowledge is STRICTLY LIMITED to the information provided in the context below."
-        f"If the user asks about ANYTHING else (e.g., weather, politics, general knowledge, your name),"
-        f"you MUST politely refuse to answer"
-        f"Here is all the information you have about the user's current bookings: {context_text}."
-    )
-        try:
-            stream = await self.client.chat.completions.create(
-            model="mistral",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.query}
-            ],
-            stream=True,
-            temperature=0.3,
-            )
-            async for chunk in stream:
-                delta = chunk.choices[0].delta
-                if delta and delta.content:
-                    yield train_booking_pb2.LLMAnswer(answer=delta.content)
-            
-        except Exception as e:
-            print(f"  > LLM Error: {e}")
-            answer = "I'm sorry, I couldn't process that question."
-            yield train_booking_pb2.LLMAnswer(answer=answer)
