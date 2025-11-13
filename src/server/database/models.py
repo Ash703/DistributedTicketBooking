@@ -305,6 +305,38 @@ async def get_bookings_by_user_id(user_id):
     await conn.close()
     return bookings
 
+async def get_all_train_services_for_context():
+    """
+    Retrieves a list of all future train services to be used as LLM context.
+    """
+    conn = await get_db_connection()
+    try:
+        # We only select trains departing from 'now' onwards to keep context relevant
+        # Using SQLite's 'datetime' function for comparison
+        async with conn.execute("""
+            SELECT
+                t.train_name,
+                ts.datetime_of_departure,
+                ts.seat_type,
+                ts.seats_available,
+                source_city.city_name as source,
+                dest_city.city_name as destination
+            FROM TrainServices ts
+            JOIN Trains t ON ts.train_number = t.train_number
+            JOIN Cities source_city ON t.source_city_id = source_city.city_id
+            JOIN Cities dest_city ON t.destination_city_id = dest_city.city_id
+            WHERE ts.datetime_of_departure >= datetime('now')
+            ORDER BY ts.datetime_of_departure ASC
+            LIMIT 20
+        """) as cursor:
+            services = await cursor.fetchall()
+            return services
+    except Exception as e:
+        print(f"Error fetching context for LLM: {e}")
+        return []
+    finally:
+        await conn.close()
+
 async def get_service_price(service_id):
     """Read-only helper to get price and availability."""
     conn = await get_db_connection()

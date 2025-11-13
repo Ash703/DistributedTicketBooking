@@ -8,6 +8,7 @@ import uuid
 from database import models as db_models
 from utils import security as security_utils
 from utils import config
+from openai import OpenAI
 
 class BookingService(train_booking_pb2_grpc.TicketingServicer):
 
@@ -387,3 +388,71 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             return train_booking_pb2.StatusResponse(success=False, message=raft_msg)
 
         return train_booking_pb2.StatusResponse(success=True, message="Booking cancelled successfully.")
+    
+    async def AskBot(self, request, context):
+        print(f"Chatbot query: {request.query}")
+        
+        # 1. Authenticate (Must await!)
+        user = await db_models.get_user_by_token(request.customer_token)
+        if not user:
+            context.set_code(grpc.StatusCode.UNAUTHENTICATED)
+            context.set_details("Invalid or expired token.")
+            yield train_booking_pb2.LLMAnswer(answer="Please log in.")
+            return
+
+        # 2. Get User Context (Must await!)
+        user_bookings = await db_models.get_bookings_by_user_id(user['user_id'])
+        
+        # 3. Get Train Catalog Context 
+        # This lets the bot answer questions about *available* trains too.
+        # all_trains = await db_models.get_all_train_services_for_context()
+
+        # Build Context String
+        context_text = "USER BOOKINGS:\n"
+        if not user_bookings:
+            context_text += "The user currently has no confirmed bookings.\n"
+        else:
+            for booking in user_bookings:
+                context_text += (
+                    f"- Booking ID {booking['booking_id'][:8]} for '{booking['train_name']}' "
+                    f"from '{booking['source']}' to '{booking['destination']}' "
+                    f"on {booking['datetime_of_departure']}. Status: {booking['status']}.\n"
+                )
+        
+        context_text += "\nAVAILABLE TRAIN CATALOG:\n"
+        # if all_trains:
+        #     for t in all_trains:
+        #         context_text += (
+        #             f"- Train '{t['train_name']}' from '{t['source']}' to '{t['destination']}' "
+        #             f"departs {t['datetime_of_departure']}. ({t['seats_available']} seats left).\n"
+        #         )
+
+        # Build System Prompt
+        system_prompt = (
+            f"You are a helpful train booking assistant for user ID {user['user_id']}.\n"
+            f"You MUST ONLY answer questions related to train bookings or schedules based on the context below.\n"
+            f"If the user asks about ANYTHING else (weather, politics, etc), politely refuse.\n\n"
+            f"CONTEXT DATA:\n{context_text}"
+        )
+
+        # 4. Call LLM and Stream
+        try:
+            # Note: accessing self.client is synchronous, but that's okay for this setup.
+            stream = self.client.chat.completions.create(
+                model="mistral",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": request.query}
+                ],
+                stream=True,
+                temperature=0.3,
+            )
+            
+            for chunk in stream:
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    yield train_booking_pb2.LLMAnswer(answer=delta.content)
+            
+        except Exception as e:
+            print(f"LLM Error: {e}")
+            yield train_booking_pb2.LLMAnswer(answer="Sorry, I am currently offline or having trouble answering.")
