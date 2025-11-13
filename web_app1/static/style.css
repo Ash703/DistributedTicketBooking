@@ -1,0 +1,268 @@
+/* --- BASE STYLES (From your snippet) --- */
+@import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600,700,800,900');
+
+body {
+	font-family: 'Poppins', sans-serif;
+	font-weight: 300;
+	font-size: 15px;
+	line-height: 1.7;
+	color: #c4c3ca;
+	background-color: #1f2029;
+	overflow-x: hidden;
+    margin: 0;
+}
+
+/* --- UTILITIES --- */
+.hidden { display: none !important; }
+.error-text { color: #ff7675; font-size: 13px; }
+.success-text { color: #55efc4; font-size: 13px; }
+
+/* --- NAVIGATION --- */
+#main-nav {
+    background-color: #2a2b38;
+    padding: 15px 30px;
+    border-bottom: 1px solid #3e3f4e;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    z-index: 1000;
+}
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.brand { font-weight: 700; font-size: 20px; color: #ffeba7; }
+.user-info { display: flex; gap: 15px; align-items: center; color: #fff; }
+.btn-small {
+    background: #102770;
+    color: #ffeba7;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.btn-small:hover { background: #ffeba7; color: #102770; }
+
+/* --- AUTH SECTION (Your 3D CSS) --- */
+a { cursor: pointer; transition: all 200ms linear; }
+a:hover { text-decoration: none; }
+.link { color: #c4c3ca; }
+.link:hover { color: #ffeba7; }
+p { font-weight: 500; font-size: 14px; line-height: 1.7; }
+h4 { font-weight: 600; }
+h6 span{ padding: 0 20px; text-transform: uppercase; font-weight: 700; }
+.section{ position: relative; width: 100%; display: block; }
+.full-height{ min-height: 100vh; }
+[type="checkbox"]:checked, [type="checkbox"]:not(:checked){ position: absolute; left: -9999px; }
+.checkbox:checked + label, .checkbox:not(:checked) + label{
+  position: relative; display: block; text-align: center; width: 60px; height: 16px;
+  border-radius: 8px; padding: 0; margin: 10px auto; cursor: pointer; background-color: #ffeba7;
+}
+.checkbox:checked + label:before, .checkbox:not(:checked) + label:before{
+  position: absolute; display: block; width: 36px; height: 36px; border-radius: 50%;
+  color: #ffeba7; background-color: #102770; font-family: 'unicons'; content: '\eb4f';
+  z-index: 20; top: -10px; left: -10px; line-height: 36px; text-align: center; font-size: 24px;
+  transition: all 0.5s ease;
+}
+.checkbox:checked + label:before { transform: translateX(44px) rotate(-270deg); }
+.card-3d-wrap {
+  position: relative; width: 440px; max-width: 100%; height: 450px; /* Increased height for messages */
+  -webkit-transform-style: preserve-3d; transform-style: preserve-3d; perspective: 800px; margin-top: 60px;
+}
+.card-3d-wrapper {
+  width: 100%; height: 100%; position:absolute; top: 0; left: 0;
+  -webkit-transform-style: preserve-3d; transform-style: preserve-3d; transition: all 600ms ease-out;
+}
+.card-front, .card-back {
+  width: 100%; height: 100%; background-color: #2a2b38;
+  background-image: url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1462889/pat.svg');
+  background-position: bottom center; background-repeat: no-repeat; background-size: 300%;
+  position: absolute; border-radius: 6px; left: 0; top: 0;
+  -webkit-transform-style: preserve-3d; transform-style: preserve-3d;
+  -webkit-backface-visibility: hidden; -moz-backface-visibility: hidden; -o-backface-visibility: hidden; backface-visibility: hidden;
+}
+.card-back { transform: rotateY(180deg); }
+.checkbox:checked ~ .card-3d-wrap .card-3d-wrapper { transform: rotateY(180deg); }
+.center-wrap{ position: absolute; width: 100%; padding: 0 35px; top: 50%; left: 0; transform: translate3d(0, -50%, 35px) perspective(100px); z-index: 20; display: block; }
+.form-group{ position: relative; display: block; margin: 0; padding: 0; }
+.form-style {
+  padding: 13px 20px; padding-left: 55px; height: 48px; width: 100%; font-weight: 500; border-radius: 4px;
+  font-size: 14px; line-height: 22px; letter-spacing: 0.5px; outline: none; color: #c4c3ca;
+  background-color: #1f2029; border: none; transition: all 200ms linear; box-shadow: 0 4px 8px 0 rgba(21,21,21,.2);
+}
+.form-style:focus, .form-style:active { border: none; outline: none; box-shadow: 0 4px 8px 0 rgba(21,21,21,.2); }
+.input-icon { position: absolute; top: 0; left: 18px; height: 48px; font-size: 24px; line-height: 48px; text-align: left; color: #ffeba7; transition: all 200ms linear; }
+.btn{
+  border-radius: 4px; height: 44px; font-size: 13px; font-weight: 600; text-transform: uppercase;
+  transition: all 200ms linear; padding: 0 30px; letter-spacing: 1px; display: inline-flex;
+  align-items: center; justify-content: center; border: none; background-color: #ffeba7;
+  color: #102770; box-shadow: 0 8px 24px 0 rgba(255,235,167,.2); cursor: pointer;
+}
+.btn:active, .btn:focus, .btn:hover{ background-color: #102770; color: #ffeba7; box-shadow: 0 8px 24px 0 rgba(16,39,112,.2); }
+
+/* --- APP CONTENT (Logged In) --- */
+.main-content { margin-top: 80px; max-width: 1200px; margin-left: auto; margin-right: auto; padding: 20px; }
+
+/* Search Bar (Travel Style) */
+.search-container {
+    background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 30px;
+    color: #333;
+}
+.search-bar { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.search-field { flex: 1; display: flex; flex-direction: column; position: relative; }
+.search-field label { font-size: 12px; font-weight: 600; color: #888; margin-bottom: 5px; text-transform: uppercase; }
+.search-field select, .search-field input {
+    height: 50px; border: 1px solid #ddd; border-radius: 5px; padding: 0 15px 0 40px;
+    font-size: 16px; font-weight: 600; color: #333; width: 100%; -webkit-appearance: none;
+}
+.input-icon-s { position: absolute; bottom: 12px; left: 12px; font-size: 20px; color: #ff6b6b; }
+.search-btn {
+    background: linear-gradient(to right, #ff6b6b, #ff8e53); color: white; border: none;
+    height: 50px; padding: 0 40px; font-weight: 700; font-size: 16px; border-radius: 25px;
+    cursor: pointer; transition: 0.3s; text-transform: uppercase; flex: 0 0 auto;
+}
+.search-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4); }
+
+/* Results & Dashboard */
+.dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+.dashboard-card, .admin-card { background: #2a2b38; border-radius: 8px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); color: #fff; margin-bottom: 20px;}
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #3e3f4e; padding-bottom: 10px; }
+.btn-text { background: none; border: none; color: #ffeba7; cursor: pointer; font-size: 13px; }
+.btn-text-dark { background: none; border: 1px solid #555; color: #333; cursor: pointer; font-size: 13px; padding: 5px 10px; border-radius: 4px;}
+
+/* Tables (Custom Dark Theme) */
+table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #c4c3ca; }
+th { text-align: left; color: #888; font-size: 12px; text-transform: uppercase; padding: 10px; border-bottom: 1px solid #3e3f4e; }
+td { padding: 15px 10px; border-bottom: 1px solid #3e3f4e; font-size: 14px; }
+tr:last-child td { border-bottom: none; }
+.result-card { background: #fff; color: #333; padding: 20px; margin-bottom: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+.train-name { font-size: 18px; font-weight: 700; }
+.train-route { font-size: 14px; color: #666; }
+.train-price { font-size: 20px; font-weight: 700; color: #ff6b6b; }
+
+/* Chatbot */
+.chatbot-body { display: flex; flex-direction: column; height: 350px; }
+#chat-messages { flex: 1; overflow-y: auto; padding: 10px; background: #1f2029; border-radius: 4px; margin-bottom: 10px; }
+.chat-input-area { display: flex; gap: 10px; }
+.chat-input-area input { flex: 1; background: #1f2029; border: 1px solid #3e3f4e; color: #fff; padding: 10px; border-radius: 20px; outline: none;}
+.chat-input-area button { background: #ffeba7; color: #102770; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
+.user-msg { text-align: right; background: #102770; color: #fff; padding: 8px 12px; border-radius: 15px 15px 0 15px; margin: 5px 0; align-self: flex-end; display: inline-block; max-width: 80%; float: right; clear: both;}
+.bot-msg { text-align: left; background: #3e3f4e; color: #fff; padding: 8px 12px; border-radius: 15px 15px 15px 0; margin: 5px 0; align-self: flex-start; display: inline-block; max-width: 80%; float: left; clear: both;}
+
+/* Admin Forms Light style override */
+.form-style-light {
+    background: #f4f4f4; color: #333; border: 1px solid #ddd; width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px;
+}
+.btn-admin {
+    background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%;
+}
+.admin-card { background: #fff; color: #333; }
+
+.train-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+.train-header {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #fafafa;
+    border-bottom: 1px solid #eee;
+}
+
+.train-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #000;
+}
+
+.train-meta {
+    display: flex;
+    gap: 30px;
+    font-size: 14px;
+    color: #333;
+}
+
+.train-time {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.duration-line {
+    font-size: 12px;
+    color: #888;
+    border-bottom: 1px solid #ccc;
+    margin: 0 10px;
+    display: inline-block;
+    width: 50px;
+    position: relative;
+    top: -4px;
+}
+
+.class-container {
+    padding: 15px 20px;
+    display: flex;
+    gap: 15px;
+    overflow-x: auto; /* Allow horizontal scroll if many classes */
+}
+
+.class-card {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px 15px;
+    min-width: 140px;
+    cursor: pointer;
+    transition: 0.2s;
+    background: #fff;
+    position: relative;
+}
+
+.class-card:hover {
+    border-color: #ff6b6b;
+    background-color: #fff5f5;
+}
+
+.class-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: #333;
+}
+
+.class-price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #000;
+    margin: 5px 0;
+}
+
+.class-avail {
+    font-size: 12px;
+    color: #28a745; /* Green for available */
+    font-weight: 600;
+}
+
+.class-avail.low {
+    color: #dc3545; /* Red for low availability */
+}
+
+.book-btn-overlay {
+    margin-top: 8px;
+    width: 100%;
+    font-size: 12px;
+    padding: 5px;
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
