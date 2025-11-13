@@ -102,7 +102,20 @@
         <div id="admin-app" class="hidden">
             <h2>Admin Panel</h2>
             <div id="admin-message" style="margin-bottom: 15px;"></div>
-            
+            <div class="form-section" style="margin-top: 20px; border-top: 2px solid #eee;">
+                <h3>View All Routes</h3>
+                <form id="admin-view-trains-form" style="display: flex; gap: 10px; align-items: center;">
+                    <select id="admin-filter-from" style="flex: 1;">
+                        <option value="">Filter by Source (Optional)</option>
+                    </select>
+                    <select id="admin-filter-to" style="flex: 1;">
+                        <option value="">Filter by Destination (Optional)</option>
+                    </select>
+                    <button type="submit" style="width: auto;">Filter</button>
+                    <button type="button" id="admin-view-all-btn" class="secondary" style="width: auto;">Show All</button>
+                </form>
+                <div id="admin-trains-list" style="margin-top: 15px;"></div>
+            </div>
             <div class="form-section">
                 <h3>Add New Train Route</h3>
                 <form id="add-train-form">
@@ -163,6 +176,11 @@
         const searchFormEl = document.getElementById('search-form');
         const viewBookingsBtn = document.getElementById('view-bookings-button');
         const chatForm = document.getElementById('chat-form');
+        const adminViewForm = document.getElementById('admin-view-trains-form');
+        const adminViewList = document.getElementById('admin-trains-list');
+        const adminFilterFrom = document.getElementById('admin-filter-from');
+        const adminFilterTo = document.getElementById('admin-filter-to');
+        const adminViewAllBtn = document.getElementById('admin-view-all-btn');
         
         // --- DOM Elements (Admin) ---
         const adminMessage = document.getElementById('admin-message');
@@ -418,6 +436,46 @@
                 adminApp.classList.add('hidden');
             }
         }
+        async function fetchAdminTrains(sourceId, destId) {
+            adminViewList.innerHTML = '<p class="loading">Loading routes...</p>';
+            
+            const resp = await apiFetch('/api/admin/view_trains', {
+                token: state.token,
+                source_city_id: sourceId,
+                destination_city_id: destId
+            });
+
+            if (!resp || resp.length === 0) {
+                adminViewList.innerHTML = '<p>No trains found.</p>';
+                return;
+            }
+
+            let table = '<table><tr><th>Number</th><th>Name</th><th>Type</th><th>From</th><th>To</th></tr>';
+            resp.forEach(t => {
+                table += `<tr>
+                    <td>${t.number}</td>
+                    <td><strong>${t.name}</strong></td>
+                    <td>${t.type}</td>
+                    <td>${t.source}</td>
+                    <td>${t.destination}</td>
+                </tr>`;
+            });
+            table += '</table>';
+            adminViewList.innerHTML = table;
+        }
+
+        // Event Listener: Filter Form
+        adminViewForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            fetchAdminTrains(adminFilterFrom.value, adminFilterTo.value);
+        });
+
+        // Event Listener: Show All Button
+        adminViewAllBtn.addEventListener('click', () => {
+            adminFilterFrom.value = "";
+            adminFilterTo.value = "";
+            fetchAdminTrains(0, 0);
+        });
 
         async function loadCities() {
             const resp = await apiFetch('/api/cities');
@@ -437,6 +495,14 @@
                 toSelect.innerHTML = '<option value="">Select Destination City...</option>';
                 adminFromSelect.innerHTML = '<option value="">Select Departure City...</option>';
                 adminToSelect.innerHTML = '<option value="">Select Destination City...</option>';
+                adminFilterFrom.innerHTML = '<option value="">Filter by Source (Optional)</option>';
+            adminFilterTo.innerHTML = '<option value="">Filter by Destination (Optional)</option>';
+            state.cities.forEach(city => {
+                // ... existing logic ...
+                let opt = new Option(`${city.city_name}`, city.city_id);
+                adminFilterFrom.add(opt.cloneNode(true));
+                adminFilterTo.add(opt.cloneNode(true));
+            });
                 
                 state.cities.forEach(city => {
                     let option = new Option(`${city.city_name} (${city.city_code})`, city.city_id);

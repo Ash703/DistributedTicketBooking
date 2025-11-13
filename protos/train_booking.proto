@@ -16,6 +16,7 @@ service Ticketing {
   // --- Admin Functions ---
   rpc AddTrain(AddTrainRequest) returns (StatusResponse);
   rpc AddTrainService(AddTrainServiceRequest) returns (StatusResponse);
+  rpc GetAllTrains(GetAllTrainsRequest) returns (GetAllTrainsResponse);
 
   // --- Customer Booking Flow ---
   rpc InitiateBooking(InitiateBookingRequest) returns (BookingConfirmation); 
@@ -86,6 +87,24 @@ message AddTrainServiceRequest {
   string datetime_of_departure = 3; // Format "YYYY-MM-DD HH:MM:SS"
   string datetime_of_arrival = 4;   // Format "YYYY-MM-DD HH:MM:SS"
   repeated SeatInfo seat_info = 5;
+}
+
+message GetAllTrainsRequest {
+  string admin_token = 1;
+  int32 source_city_id = 2;      // 0 if not filtering by source
+  int32 destination_city_id = 3; // 0 if not filtering by destination
+}
+
+message TrainInfo {
+  int32 train_number = 1;
+  string train_name = 2;
+  string source_city = 3;
+  string destination_city = 4;
+  string train_type = 5;
+}
+
+message GetAllTrainsResponse {
+  repeated TrainInfo trains = 1;
 }
 
 // --- Customer Messages ---

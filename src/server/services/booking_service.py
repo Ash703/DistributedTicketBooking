@@ -322,3 +322,36 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             city_proto.city_name = city_row['city_name']
             city_proto.city_code = city_row['city_code']
         return response
+    
+    async def GetAllTrains(self, request, context):
+        print(f"Admin Request: List trains (Source: {request.source_city_id}, Dest: {request.destination_city_id})")
+
+        # 1. Authenticate Admin (This is a READ operation, so we can do it on any node)
+        user = await db_models.get_user_by_token(request.admin_token)
+        if not user or user['role'] != 'ADMIN':
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details("Unauthorized: Admin access required.")
+            return train_booking_pb2.GetAllTrainsResponse()
+
+        # 2. Fetch Data from the local database
+        # (We assume get_trains_admin was added to database/models.py)
+        try:
+            trains_db = await db_models.get_trains_admin(request.source_city_id, request.destination_city_id)
+        except Exception as e:
+            print(f"Error fetching trains from DB: {e}")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Database error: {e}")
+            return train_booking_pb2.GetAllTrainsResponse()
+
+        # 3. Build the gRPC Response
+        response = train_booking_pb2.GetAllTrainsResponse()
+        for row in trains_db:
+            t = response.trains.add()
+            t.train_number = row['train_number']
+            t.train_name = row['train_name']
+            t.train_type = row['train_type']
+            t.source_city = row['source_name']
+            t.destination_city = row['dest_name']
+            
+        print(f"Found {len(trains_db)} trains matching filter.")
+        return response

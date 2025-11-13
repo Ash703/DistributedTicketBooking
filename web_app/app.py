@@ -206,6 +206,33 @@ def api_ask_bot():
     # Return a streaming response
     return Response(stream_response_generator(), mimetype='text/event-stream')
 
+@app.route('/api/admin/view_trains', methods=['POST'])
+def api_admin_view_trains():
+    data = request.json
+    
+    # If 'source_id' is missing or empty string, treat as 0 (no filter)
+    src_id = int(data.get('source_city_id') or 0)
+    dst_id = int(data.get('destination_city_id') or 0)
+
+    grpc_request = train_booking_pb2.GetAllTrainsRequest(
+        admin_token=data.get('token'),
+        source_city_id=src_id,
+        destination_city_id=dst_id
+    )
+    
+    # Use the redirect client (even for reads, it's safer to hit a known node)
+    grpc_response = call_with_leader_redirect("GetAllTrains", grpc_request)
+    
+    trains_list = [{
+        "number": t.train_number,
+        "name": t.train_name,
+        "type": t.train_type,
+        "source": t.source_city,
+        "destination": t.destination_city
+    } for t in grpc_response.trains]
+    
+    return jsonify(trains_list)
+
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8000)
+    app.run(debug=True, port=8000) 

@@ -88,6 +88,7 @@ def call_with_leader_redirect(rpc_name, request, max_retries=3):
             self.answer = message
             self.booking_id = ""
             self.total_cost = 0.0
+            self.trains = []
 
     return FallbackResponse()
 

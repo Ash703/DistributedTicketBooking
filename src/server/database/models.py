@@ -314,3 +314,42 @@ async def get_service_price(service_id):
             return row # Returns None if not found, or a Row object
     finally:
         await conn.close()
+        
+async def get_trains_admin(source_id=0, dest_id=0):
+    """
+    Retrieves trains. 
+    - If source_id > 0, filter by source.
+    - If dest_id > 0, filter by destination.
+    - If both 0, return all.
+    """
+    conn = await get_db_connection()
+    try:
+        # Base query
+        sql = """
+            SELECT 
+                t.train_number, t.train_name, t.train_type,
+                s.city_name as source_name, 
+                d.city_name as dest_name
+            FROM Trains t
+            JOIN Cities s ON t.source_city_id = s.city_id
+            JOIN Cities d ON t.destination_city_id = d.city_id
+            WHERE 1=1
+        """
+        params = []
+        
+        # Add filters dynamically
+        if source_id > 0:
+            sql += " AND t.source_city_id = ?"
+            params.append(source_id)
+        
+        if dest_id > 0:
+            sql += " AND t.destination_city_id = ?"
+            params.append(dest_id)
+            
+        sql += " ORDER BY t.train_number"
+
+        async with conn.execute(sql, tuple(params)) as cursor:
+            trains = await cursor.fetchall()
+            return trains
+    finally:
+        await conn.close()
