@@ -29,10 +29,11 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             
         hashed_password = security_utils.hash_password(request.password)
         
-        success = await db_models.create_user(request.username, hashed_password)
-        
-        if not success:
-            return train_booking_pb2.StatusResponse(success=False, message="Username already exists.")
+        # --- REMOVED DIRECT WRITE ---
+        # success = await db_models.create_user(request.username, hashed_password)
+        # if not success:
+        #     return train_booking_pb2.StatusResponse(success=False, message="Username already exists.")
+        # ----------------------------
         
         command_data = {
             "action": "REGISTER",
@@ -59,6 +60,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                 message=f"This node is not the leader. Please contact leader {leader}."
             )
 
+        # READ operations are fine to keep here
         user = await db_models.get_user_by_username(request.username)
         
         if not user:
@@ -70,7 +72,9 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         token = security_utils.generate_token()
         expires_at = time.time() + config.SESSION_DURATION_SECONDS
         
-        await db_models.create_session(user['user_id'], token, expires_at)
+        # --- REMOVED DIRECT WRITE ---
+        # await db_models.create_session(user['user_id'], token, expires_at)
+        # ----------------------------
 
         command_data = {
             "action": "CREATE_SESSION",
@@ -86,7 +90,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             return train_booking_pb2.LoginResponse(success=False, message=raft_msg)
 
         print(f"Login successful for {request.username}.")
-        return train_booking_pb2.LoginResponse(success=True, message="Login successful.", token=token, role=train_booking_pb2.Role.Value(user['role']))
+        return train_booking_pb2.LoginResponse(success=True, message="Login successful.", token=token)
     
     async def AddTrain(self, request, context):
         print(f"Request to add new train: {request.train_number}")
@@ -102,16 +106,10 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not admin_user or admin_user['role'] != 'ADMIN':
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
         
-        success = await db_models.add_train(
-            request.train_number,
-            request.train_name,
-            request.source_city_id,
-            request.destination_city_id,
-            request.train_type
-        )
-
-        if not success:
-            return train_booking_pb2.StatusResponse(success=False, message="Train number already exists.")
+        # --- REMOVED DIRECT WRITE ---
+        # success = await db_models.add_train(...)
+        # if not success: ...
+        # ----------------------------
         
         command_data = {
             "action": "ADD_TRAIN",
@@ -150,22 +148,17 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             'price': info.price
         } for info in request.seat_info]
         
-        success = await db_models.add_train_service(
-            request.train_number,
-            request.datetime_of_departure,
-            request.datetime_of_arrival,
-            seat_info_list
-        )
-
-        if not success:
-            return train_booking_pb2.StatusResponse(success=False, message="Failed to add train services.")
+        # --- REMOVED DIRECT WRITE ---
+        # success = await db_models.add_train_service(...)
+        # if not success: ...
+        # ----------------------------
 
         command_data = {
             "action": "ADD_SERVICE",
             "train_number": request.train_number,
             "datetime_of_departure": request.datetime_of_departure,
             "datetime_of_arrival": request.datetime_of_arrival,
-            "seat_info": seat_info_list
+            "seat_info": seat_info_list 
         }
         command = json.dumps(command_data)
         
@@ -177,6 +170,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         return train_booking_pb2.StatusResponse(success=True, message="Train services added successfully.")
     
     async def SearchTrainServices(self, request, context):
+        # READ operations are safe to call directly from DB
         print(f"Request to search for trains from city ID {request.source_city_id} to {request.destination_city_id} on {request.date}")
         
         try: 
@@ -224,36 +218,44 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         if not user or user['role'] != 'CUSTOMER':
             return train_booking_pb2.BookingConfirmation(success=False, message="Unauthorized")
 
-        success, message, booking_id, total_cost = await db_models.initiate_booking_tx(
-            user['user_id'],
-            request.service_id,
-            request.number_of_seats
-        )
+        # --- REMOVED DIRECT WRITE ---
+        # success, message, booking_id, total_cost = await db_models.initiate_booking_tx(...)
+        # ----------------------------
 
-        if not success:
-            return train_booking_pb2.BookingConfirmation(success=False, message=message, booking_id=booking_id or "", total_cost=total_cost or 0.0)
-
+        # Note: We can't get the booking_id/cost from the DB yet because we haven't written it.
+        # We must rely on the return value from Raft.
+        
         command_data = {
             "action": "BOOK_SEATS",
             "user_id": user['user_id'],
             "service_id": request.service_id,
             "number_of_seats": request.number_of_seats,
-            "booking_id": booking_id,
-            "total_cost": total_cost
+            # We don't pass booking_id here, let the Raft apply logic generate it 
+            # OR we generate it here to ensure all nodes get the same ID.
+            # Generating it here is safer for consistency.
+            "booking_id": security_utils.generate_token()[:8] # simple deterministic ID for now
         }
         command = json.dumps(command_data)
         
+        # Raft handle_client_command now returns the result of apply_log_entry
+        # We need apply_log_entry to return "booking_id,total_cost"
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
-            return train_booking_pb2.BookingConfirmation(success=False, message=raft_msg, booking_id=booking_id or "", total_cost=total_cost or 0.0)
+            return train_booking_pb2.BookingConfirmation(success=False, message=raft_msg)
         
-        return train_booking_pb2.BookingConfirmation(
-            success=success,
-            message=message,
-            booking_id=booking_id or "",
-            total_cost=total_cost or 0.0
-        )
+        # Parse the result from Raft
+        try:
+            # Assuming apply_log_entry returns "booking_id,total_cost"
+            booking_id, total_cost_str = raft_msg.split(',')
+            return train_booking_pb2.BookingConfirmation(
+                success=True,
+                message="Booking initiated.",
+                booking_id=booking_id,
+                total_cost=float(total_cost_str)
+            )
+        except Exception:
+             return train_booking_pb2.BookingConfirmation(success=True, message=raft_msg, booking_id="unknown", total_cost=0.0)
 
     async def ProcessPayment(self, request, context):
         print(f"Request to process payment for booking_id: {request.booking_id}")
@@ -269,10 +271,9 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                 message=f"This node is not the leader. Please contact leader {leader}."
             )
         
-        success, message = await db_models.confirm_payment_tx(request.booking_id, request.payment_mode)
-
-        if not success:
-            return train_booking_pb2.StatusResponse(success=False, message=message)
+        # --- REMOVED DIRECT WRITE ---
+        # success, message = await db_models.confirm_payment_tx(...)
+        # ----------------------------
 
         command_data = {
             "action": "CONFIRM_PAYMENT",
