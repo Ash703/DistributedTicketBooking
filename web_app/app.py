@@ -206,6 +206,16 @@ def api_ask_bot():
     # Return a streaming response
     return Response(stream_response_generator(), mimetype='text/event-stream')
 
+@app.route('/api/cancel_booking', methods=['POST'])
+def api_cancel_booking():
+    data = request.json
+    grpc_request = train_booking_pb2.CancelBookingRequest(
+        customer_token=data.get('token'),
+        booking_id=data.get('booking_id')
+    )
+    grpc_response = call_with_leader_redirect("CancelBooking", grpc_request)
+    return jsonify({"success": grpc_response.success, "message": grpc_response.message})
+
 @app.route('/api/admin/view_trains', methods=['POST'])
 def api_admin_view_trains():
     data = request.json

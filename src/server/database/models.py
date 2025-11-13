@@ -353,3 +353,48 @@ async def get_trains_admin(source_id=0, dest_id=0):
             return trains
     finally:
         await conn.close()
+        
+async def cancel_booking_tx(booking_id, user_id):
+    """
+    Cancels a booking and refunds the seats to the inventory.
+    """
+    conn = await get_db_connection()
+    try:
+        await conn.execute("BEGIN TRANSACTION")
+
+        # 1. Get booking details to find service_id and seat count
+        async with conn.execute(
+            "SELECT service_id, number_of_seats, status FROM Bookings WHERE booking_id = ? AND user_id = ?", 
+            (booking_id, user_id)
+        ) as cursor:
+            booking = await cursor.fetchone()
+
+        if not booking:
+            await conn.rollback()
+            return False, "Booking not found or does not belong to you."
+
+        # 2. Idempotency Check: If already cancelled, do nothing but return success
+        if booking['status'] == 'CANCELLED':
+            await conn.rollback()
+            return True, "Booking was already cancelled."
+
+        # 3. Update Booking Status
+        await conn.execute("UPDATE Bookings SET status = 'CANCELLED' WHERE booking_id = ?", (booking_id,))
+
+        # 4. Refund Seats (Increase available seats)
+        # We perform a read-modify-write on the TrainServices table
+        async with conn.execute("SELECT seats_available FROM TrainServices WHERE service_id = ?", (booking['service_id'],)) as cursor:
+            service = await cursor.fetchone()
+        
+        if service:
+            new_count = service['seats_available'] + booking['number_of_seats']
+            await conn.execute("UPDATE TrainServices SET seats_available = ? WHERE service_id = ?", (new_count, booking['service_id']))
+
+        await conn.commit()
+        return True, "Booking cancelled successfully."
+
+    except Exception as e:
+        await conn.rollback()
+        return False, f"Error cancelling booking: {e}"
+    finally:
+        await conn.close()

@@ -395,6 +395,18 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
                         data["datetime_of_arrival"], data["seat_info"]
                     )
                     return "Service Added"
+                
+                elif action == "CANCEL_BOOKING":
+                    success, msg = await db_models.cancel_booking_tx(
+                        data["booking_id"],
+                        data["user_id"]
+                    )
+                    if success:
+                        print(f"[{self.node_id}] Booking {data['booking_id']} cancelled.")
+                        return "Booking Cancelled"
+                    else:
+                        print(f"[{self.node_id}] Failed to cancel booking: {msg}")
+                        return msg
 
                 elif action == "BOOK_SEATS":
                     # Note: In a real system, we handle idempotency here using booking_id

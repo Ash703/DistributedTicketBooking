@@ -22,6 +22,7 @@ service Ticketing {
   rpc InitiateBooking(InitiateBookingRequest) returns (BookingConfirmation); 
   rpc ProcessPayment(ProcessPaymentRequest) returns (StatusResponse);
   rpc GetMyBookings(GetMyBookingsRequest) returns (BookingList);
+  rpc CancelBooking(CancelBookingRequest) returns (StatusResponse);
 
   // --- For LLM IAnswers ---
   rpc AskBot(LLMQuery) returns (stream LLMAnswer);
@@ -126,6 +127,11 @@ message ServiceSummary {
   SeatType seat_type = 8;
   int32 seats_available = 9;
   double price = 10;
+}
+
+message CancelBookingRequest {
+  string customer_token = 1;
+  string booking_id = 2;
 }
 
 message SearchResponse {

@@ -90,6 +90,11 @@ class TicketingStub(object):
                 request_serializer=train__booking__pb2.GetMyBookingsRequest.SerializeToString,
                 response_deserializer=train__booking__pb2.BookingList.FromString,
                 _registered_method=True)
+        self.CancelBooking = channel.unary_unary(
+                '/train_booking.Ticketing/CancelBooking',
+                request_serializer=train__booking__pb2.CancelBookingRequest.SerializeToString,
+                response_deserializer=train__booking__pb2.StatusResponse.FromString,
+                _registered_method=True)
         self.AskBot = channel.unary_stream(
                 '/train_booking.Ticketing/AskBot',
                 request_serializer=train__booking__pb2.LLMQuery.SerializeToString,
@@ -171,6 +176,12 @@ class TicketingServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CancelBooking(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def AskBot(self, request, context):
         """--- For LLM IAnswers ---
         """
@@ -235,6 +246,11 @@ def add_TicketingServicer_to_server(servicer, server):
                     servicer.GetMyBookings,
                     request_deserializer=train__booking__pb2.GetMyBookingsRequest.FromString,
                     response_serializer=train__booking__pb2.BookingList.SerializeToString,
+            ),
+            'CancelBooking': grpc.unary_unary_rpc_method_handler(
+                    servicer.CancelBooking,
+                    request_deserializer=train__booking__pb2.CancelBookingRequest.FromString,
+                    response_serializer=train__booking__pb2.StatusResponse.SerializeToString,
             ),
             'AskBot': grpc.unary_stream_rpc_method_handler(
                     servicer.AskBot,
@@ -540,6 +556,33 @@ class Ticketing(object):
             '/train_booking.Ticketing/GetMyBookings',
             train__booking__pb2.GetMyBookingsRequest.SerializeToString,
             train__booking__pb2.BookingList.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CancelBooking(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/train_booking.Ticketing/CancelBooking',
+            train__booking__pb2.CancelBookingRequest.SerializeToString,
+            train__booking__pb2.StatusResponse.FromString,
             options,
             channel_credentials,
             insecure,

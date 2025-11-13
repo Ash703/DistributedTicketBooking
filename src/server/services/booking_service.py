@@ -355,3 +355,35 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             
         print(f"Found {len(trains_db)} trains matching filter.")
         return response
+    
+    async def CancelBooking(self, request, context):
+        print(f"Request to cancel booking: {request.booking_id}")
+
+        # 1. Check Leader
+        if self.raft.state != "leader":
+            leader = self.raft.leader_id or "unknown"
+            return train_booking_pb2.StatusResponse(
+                success=False,
+                message=f"This node is not the leader. Please contact leader {leader}."
+            )
+
+        # 2. Authenticate User
+        user = await db_models.get_user_by_token(request.customer_token)
+        if not user:
+            return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
+
+        # 3. Create JSON Command
+        command_data = {
+            "action": "CANCEL_BOOKING",
+            "booking_id": request.booking_id,
+            "user_id": user['user_id'] # Pass user_id to ensure ownership verification in DB
+        }
+        command = json.dumps(command_data)
+
+        # 4. Replicate
+        raft_success, raft_msg = await self.raft.handle_client_command(command)
+
+        if not raft_success:
+            return train_booking_pb2.StatusResponse(success=False, message=raft_msg)
+
+        return train_booking_pb2.StatusResponse(success=True, message="Booking cancelled successfully.")
