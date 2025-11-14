@@ -38,7 +38,6 @@ The system provides:
 
 ### ✔ Multiple Interfaces
 
-* **CLI Client** (Python interactive menu)
 * **Flask Web App** (simple frontend)
 * **Distributed gRPC backend** (3-node cluster)
 
@@ -192,28 +191,3 @@ Node1TicketBooking.db
 Node2TicketBooking.db
 Node3TicketBooking.db
 ```
-
----
-
-# 🧪 Key Features of the Project
-
-### 🔹 Distributed Consensus (Raft)
-
-* Leader election
-* Log replication
-* Fault recovery
-* Heartbeats
-* Commit & apply stages
-
-### 🔹 Booking Engine
-
-* Transactional seat reservation
-* Payment confirmation
-* Unique session token enforcement
-* Automatic rollback on failure
-
-### 🔹 Async SQLite
-
-* WAL mode for performance
-* Locks managed using `asyncio.Lock`
-* Fully non-blocking server
