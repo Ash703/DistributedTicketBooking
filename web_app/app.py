@@ -11,9 +11,11 @@ from grpc_client import call_with_leader_redirect, call_streaming_rpc
 
 app = Flask(__name__)
 
+
 SEAT_TYPE_MAP = {
     0: 'UNKNOWN', 1: 'AC1', 2: 'AC2', 3: 'AC3', 4: 'GENERAL',
 }
+
 
 
 @app.route('/')
@@ -124,7 +126,6 @@ def api_get_my_bookings():
     return jsonify(bookings_list)
 
 
-
 @app.route('/api/admin/add_train', methods=['POST'])
 def api_add_train():
     data = request.json
@@ -164,6 +165,7 @@ def api_add_service():
     return jsonify({"success": grpc_response.success, "message": grpc_response.message})
 
 
+
 @app.route('/api/ask_bot', methods=['POST'])
 def api_ask_bot():
     """
@@ -181,8 +183,6 @@ def api_ask_bot():
             data_payload = json.dumps({"answer": chunk.answer})
             yield f"data: {data_payload}\n\n"
         yield "data: [STREAM_END]\n\n"
-
-
     return Response(stream_response_generator(), mimetype='text/event-stream')
 
 @app.route('/api/cancel_booking', methods=['POST'])
@@ -198,7 +198,6 @@ def api_cancel_booking():
 @app.route('/api/admin/view_trains', methods=['POST'])
 def api_admin_view_trains():
     data = request.json
-    
     src_id = int(data.get('source_city_id') or 0)
     dst_id = int(data.get('destination_city_id') or 0)
 
@@ -207,7 +206,6 @@ def api_admin_view_trains():
         source_city_id=src_id,
         destination_city_id=dst_id
     )
-    
     grpc_response = call_with_leader_redirect("GetAllTrains", grpc_request)
     
     trains_list = [{
@@ -222,4 +220,4 @@ def api_admin_view_trains():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8000) 
+    app.run(debug=True, port=8000)

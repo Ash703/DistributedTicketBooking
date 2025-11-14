@@ -4,550 +4,215 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Distributed Train Booking</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; background-color: #f4f7f6; color: #333; }
-        #container { max-width: 900px; margin: 20px auto; padding: 20px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h1, h2, h3 { border-bottom: 2px solid #eee; padding-bottom: 5px; color: #0056b3; }
-        .auth-forms { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
-        .form-section { flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; }
-        input, select, button { font-size: 14px; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; width: 100%; }
-        button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background-color: #0056b3; }
-        button.secondary { background-color: #6c757d; }
-        button.secondary:hover { background-color: #5a6268; }
-        button.danger { background-color: #dc3545; }
-        button.danger:hover { background-color: #c82333; }
-        .hidden { display: none; }
-        .loading { color: #888; }
-        .error { color: #d9534f; font-weight: bold; }
-        .success { color: #28a745; font-weight: bold; }
-        #user-status { background-color: #e6f7ff; border: 1px solid #b3e0ff; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;}
-        #user-status button { width: auto; margin: 0; }
-        
-        /* Tables */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        td button { width: auto; font-size: 12px; padding: 5px 10px; }
-
-        /* Chatbot */
-        #chat-container { border: 1px solid #ccc; border-radius: 8px; margin-top: 20px; }
-        #chat-messages { height: 200px; overflow-y: scroll; padding: 10px; background: #fdfdfd; }
-        #chat-messages div { margin-bottom: 10px; padding: 8px; border-radius: 4px; }
-        #chat-messages .user { text-align: right; background-color: #e6f7ff; color: #0056b3; margin-left: 20%; }
-        #chat-messages .bot { text-align: left; background-color: #f1f1f1; color: #333; margin-right: 20%; }
-        #chat-form { display: flex; border-top: 1px solid #ccc; }
-        #chat-form input { flex: 1; border: none; margin: 0; border-radius: 0 0 0 8px; }
-        #chat-form button { width: auto; border-radius: 0 0 8px 0; margin: 0; }
-    </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:400,500,600,700,800,900">
+    <link rel="stylesheet" href="https://unicons.iconscout.com/release/v2.1.9/css/unicons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div id="container">
-        <h1>Distributed Train Booking System</h1>
 
-        <div id="user-status">
-            <span id="user-greeting">You are not logged in.</span>
-            <button id="logout-button" class="hidden">Logout</button>
-        </div>
-
-        <div id="auth-section">
-            <div class="auth-forms">
-                <div class="form-section">
-                    <h2>Login</h2>
-                    <form id="login-form">
-                        <input type="text" id="login-username" placeholder="Username" required>
-                        <input type="password" id="login-password" placeholder="Password" required>
-                        <button type="submit">Login</button>
-                    </form>
-                </div>
-                <div class="form-section">
-                    <h2>Register</h2>
-                    <form id="register-form">
-                        <input type="text" id="register-username" placeholder="New Username" required>
-                        <input type="password" id="register-password" placeholder="New Password" required>
-                        <button type="submit">Register</button>
-                    </form>
-                </div>
+    <nav id="main-nav" class="hidden">
+        <div class="nav-container">
+            <div class="brand">
+                <i class="uil uil-train"></i> RailBook
             </div>
-            <p id="auth-message"></p>
-        </div>
-
-        <div id="customer-app" class="hidden">
-            <div class="form-section">
-                <h3>Search for Trains</h3>
-                <form id="search-form">
-                    <div style="display: flex; gap: 10px;">
-                        <select id="search-from" required><option value="">Loading cities...</option></select>
-                        <select id="search-to" required><option value="">Loading cities...</option></select>
-                        <input type="date" id="search-date" required>
-                    </div>
-                    <button type="submit">Search</button>
-                </form>
-                <div id="search-results"></div>
-            </div>
-            
-            <div class="form-section">
-                <h3>My Bookings</h3>
-                <button id="view-bookings-button" class="secondary">Refresh My Bookings</button>
-                <div id="bookings-list"></div>
-            </div>
-            
-            <div class="form-section">
-                <h3>Chatbot Assistant</h3>
-                <div id="chat-container">
-                    <div id="chat-messages"></div>
-                    <form id="chat-form">
-                        <input type="text" id="chat-input" placeholder="Ask about your bookings or trains..." required>
-                        <button type="submit">Send</button>
-                    </form>
-                </div>
+            <div class="user-info">
+                <span id="user-greeting">Welcome</span>
+                <button id="logout-button" class="btn-small">Logout</button>
             </div>
         </div>
+    </nav>
 
-        <div id="admin-app" class="hidden">
-            <h2>Admin Panel</h2>
-            <p id="admin-message"></p>
-            
-            <div class="form-section">
-                <h3>Add New Train Route</h3>
-                <form id="add-train-form">
-                    <input type="number" id="admin-train-num" placeholder="Train Number (e.g. 12951)" required>
-                    <input type="text" id="admin-train-name" placeholder="Train Name (e.g. Mumbai Rajdhani)" required>
-                    <select id="admin-from-city" required><option value="">Loading cities...</option></select>
-                    <select id="admin-to-city" required><option value="">Loading cities...</option></select>
-                    <select id="admin-train-type" required>
-                        <option value="Express">Express</option>
-                        <option value="Rajdhani">Rajdhani</option>
-                        <option value="Duronto">Duronto</option>
-                        <option value="Shatabdi">Shatabdi</option>
-                    </select>
-                    <button type="submit">Add Train</button>
-                </form>
-            </div>
-            
-            <div class="form-section">
-                <h3>Add Service Schedule</h3>
-                <form id="add-service-form">
-                    <input type="number" id="admin-service-train-num" placeholder="Train Number (must exist)" required>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="admin-service-departure" placeholder="Depart (YYYY-MM-DD HH:MM:SS)" required>
-                        <input type="text" id="admin-service-arrival" placeholder="Arrive (YYYY-MM-DD HH:MM:SS)" required>
+    <div id="auth-section" class="section">
+        <div class="container">
+            <div class="row full-height justify-content-center">
+                <div class="col-12 text-center align-self-center py-5">
+                    <div class="section pb-5 pt-5 pt-sm-2 text-center">
+                        <h6 class="mb-0 pb-3"><span>Log In </span><span>Sign Up</span></h6>
+                        <input class="checkbox" type="checkbox" id="reg-log" name="reg-log"/>
+                        <label for="reg-log"></label>
+                        <div class="card-3d-wrap mx-auto">
+                            <div class="card-3d-wrapper">
+                                <div class="card-front">
+                                    <div class="center-wrap">
+                                        <div class="section text-center">
+                                            <h4 class="mb-4 pb-3">Log In</h4>
+                                            <form id="login-form">
+                                                <div class="form-group">
+                                                    <input type="text" class="form-style" placeholder="Username" id="login-username" autocomplete="off" required>
+                                                    <i class="input-icon uil uil-user"></i>
+                                                </div>  
+                                                <div class="form-group mt-2">
+                                                    <input type="password" class="form-style" placeholder="Password" id="login-password" autocomplete="off" required>
+                                                    <i class="input-icon uil uil-lock-alt"></i>
+                                                </div>
+                                                <button type="submit" class="btn mt-4">Login</button>
+                                            </form>
+                                            <p id="login-message" class="mb-0 mt-4 text-center error-text"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-back">
+                                    <div class="center-wrap">
+                                        <div class="section text-center">
+                                            <h4 class="mb-4 pb-3">Sign Up</h4>
+                                            <form id="register-form">
+                                                <div class="form-group">
+                                                    <input type="text" class="form-style" placeholder="Choose Username" id="register-username" autocomplete="off" required>
+                                                    <i class="input-icon uil uil-user"></i>
+                                                </div>  
+                                                <div class="form-group mt-2">
+                                                    <input type="password" class="form-style" placeholder="Choose Password" id="register-password" autocomplete="off" required>
+                                                    <i class="input-icon uil uil-lock-alt"></i>
+                                                </div>
+                                                <button type="submit" class="btn mt-4">Register</button>
+                                            </form>
+                                            <p id="register-message" class="mb-0 mt-4 text-center error-text"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div id="seat-classes-container"></div>
-                    <button type="button" id="add-seat-class-btn" class="secondary">Add Seat Class</button>
-                    <br><br>
-                    <button type="submit">Add Service</button>
-                </form>
-            </div>
-
-            <div class="form-section">
-                <h3>View All Train Routes</h3>
-                <form id="admin-view-trains-form">
-                    <div class="form-row" style="display:flex; gap:10px; margin-bottom:10px;">
-                        <select id="admin-filter-from" style="flex:1;">
-                            <option value="">Filter by Source (Optional)</option>
-                        </select>
-                        <select id="admin-filter-to" style="flex:1;">
-                            <option value="">Filter by Destination (Optional)</option>
-                        </select>
-                    </div>
-                    <div class="form-row" style="display:flex; gap:10px;">
-                        <button type="submit">Filter</button>
-                        <button type="button" id="admin-view-all-btn" class="secondary">Show All</button>
-                    </div>
-                </form>
-                <div id="admin-trains-list" style="margin-top: 15px;"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // --- STATE ---
-        const state = { token: null, role: null, username: null, cities: [] };
-
-        // --- API HELPER ---
-        async function apiFetch(endpoint, body) {
-            try {
-                const options = {
-                    method: body ? 'POST' : 'GET',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: body ? JSON.stringify(body) : null
-                };
-                const response = await fetch(endpoint, options);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return await response.json();
-            } catch (err) {
-                console.error(err);
-                return null;
-            }
-        }
-
-        // --- CORE LOGIC ---
-        async function checkLoginState() {
-            state.token = sessionStorage.getItem('authToken');
-            state.role = sessionStorage.getItem('authRole');
-            state.username = sessionStorage.getItem('authUsername');
-            
-            const userGreeting = document.getElementById('user-greeting');
-            const logoutButton = document.getElementById('logout-button');
-            const authSection = document.getElementById('auth-section');
-            const customerApp = document.getElementById('customer-app');
-            const adminApp = document.getElementById('admin-app');
-
-            if (state.token) {
-                userGreeting.textContent = `Welcome, ${state.username} (${state.role})`;
-                logoutButton.classList.remove('hidden');
-                authSection.classList.add('hidden');
-                
-                await loadCities(); // Load cities immediately on login
-
-                if (state.role === 'CUSTOMER') {
-                    customerApp.classList.remove('hidden');
-                    adminApp.classList.add('hidden');
-                } else {
-                    customerApp.classList.add('hidden');
-                    adminApp.classList.remove('hidden');
-                }
-            } else {
-                userGreeting.textContent = 'You are not logged in.';
-                logoutButton.classList.add('hidden');
-                authSection.classList.remove('hidden');
-                customerApp.classList.add('hidden');
-                adminApp.classList.add('hidden');
-            }
-        }
-
-async function fetchAdminTrains(sourceId, destId) {
-            const div = document.getElementById('admin-trains-list');
-            div.innerHTML = '<p class="loading">Loading routes...</p>';
-            
-            const resp = await apiFetch('/api/admin/view_trains', {
-                token: state.token,
-                source_city_id: sourceId,
-                destination_city_id: destId
-            });
-
-            if (!resp || resp.length === 0) {
-                div.innerHTML = '<p>No trains found.</p>';
-                return;
-            }
-
-            let table = '<table><tr><th>Number</th><th>Name</th><th>Type</th><th>From</th><th>To</th></tr>';
-            resp.forEach(t => {
-                table += `<tr>
-                    <td>${t.number}</td>
-                    <td><strong>${t.name}</strong></td>
-                    <td>${t.type}</td>
-                    <td>${t.source}</td>
-                    <td>${t.destination}</td>
-                </tr>`;
-            });
-            table += '</table>';
-            div.innerHTML = table;
-        }
-
-        document.getElementById('admin-view-trains-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const s = document.getElementById('admin-filter-from').value;
-            const d = document.getElementById('admin-filter-to').value;
-            fetchAdminTrains(s || 0, d || 0);
-        });
-
-        document.getElementById('admin-view-all-btn').addEventListener('click', () => {
-            document.getElementById('admin-filter-from').value = "";
-            document.getElementById('admin-filter-to').value = "";
-            fetchAdminTrains(0, 0);
-        });
-
-        async function loadCities() {
-            const resp = await apiFetch('/api/cities');
-            if (resp) {
-                state.cities = resp;
-                
-                // List of ALL dropdown IDs that need city options
-                const dropdowns = [
-                    'search-from', 
-                    'search-to', 
-                    'admin-from-city', 
-                    'admin-to-city',
-                    'admin-filter-from',  // <--- Added this
-                    'admin-filter-to'     // <--- Added this
-                ];
-                
-                dropdowns.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        // Keep the first "placeholder" option (e.g., "Select City...")
-                        const firstOption = el.options[0];
-                        el.innerHTML = '';
-                        el.add(firstOption);
-                        
-                        state.cities.forEach(city => {
-                            // Create new option: "New Delhi (NDLS)" -> value="1"
-                            el.add(new Option(`${city.city_name} (${city.city_code})`, city.city_id));
-                        });
-                    }
-                });
-            }
-        }
-        // --- EVENT LISTENERS ---
-
-        // Logout
-        document.getElementById('logout-button').addEventListener('click', () => {
-            sessionStorage.clear();
-            checkLoginState();
-        });
-
-        // Login
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const u = document.getElementById('login-username').value;
-            const p = document.getElementById('login-password').value;
-            const resp = await apiFetch('/api/login', { username: u, password: p });
-            
-            if (resp && resp.success) {
-                sessionStorage.setItem('authToken', resp.token);
-                sessionStorage.setItem('authRole', resp.role);
-                sessionStorage.setItem('authUsername', u);
-                document.getElementById('auth-message').textContent = '';
-                checkLoginState();
-            } else {
-                document.getElementById('auth-message').className = 'error';
-                document.getElementById('auth-message').textContent = resp ? resp.message : "Login failed";
-            }
-        });
-
-        // Register
-        document.getElementById('register-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const u = document.getElementById('register-username').value;
-            const p = document.getElementById('register-password').value;
-            const resp = await apiFetch('/api/register', { username: u, password: p });
-            
-            const msg = document.getElementById('auth-message');
-            if (resp && resp.success) {
-                msg.className = 'success';
-                msg.textContent = 'Registered! Please log in.';
-                e.target.reset();
-            } else {
-                msg.className = 'error';
-                msg.textContent = resp ? resp.message : "Registration failed";
-            }
-        });
-
-        // --- CUSTOMER ACTIONS ---
-
-        // Search
-        document.getElementById('search-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const resultsDiv = document.getElementById('search-results');
-            resultsDiv.innerHTML = '<p class="loading">Searching...</p>';
-            
-            const resp = await apiFetch('/api/search', {
-                source_city_id: document.getElementById('search-from').value,
-                destination_city_id: document.getElementById('search-to').value,
-                date: document.getElementById('search-date').value
-            });
-
-            if (!resp || resp.length === 0) {
-                resultsDiv.innerHTML = '<p>No trains found.</p>';
-                return;
-            }
-
-            let html = '<table><tr><th>Train</th><th>Departs</th><th>Class</th><th>Price</th><th>Action</th></tr>';
-            resp.forEach(s => {
-                html += `<tr>
-                    <td>${s.train_name}</td>
-                    <td>${s.datetime_of_departure}</td>
-                    <td>${s.seat_type} (${s.seats_available} left)</td>
-                    <td>${s.price}</td>
-                    <td><button onclick="bookTicket('${s.service_id}')">Book</button></td>
-                </tr>`;
-            });
-            html += '</table>';
-            resultsDiv.innerHTML = html;
-        });
-
-        // Book Ticket Function (Global scope for onclick)
-        window.bookTicket = async function(serviceId) {
-            const seats = prompt("Number of seats:", "1");
-            if (!seats) return;
-
-            const initResp = await apiFetch('/api/initiate_booking', {
-                token: state.token, service_id: serviceId, num_seats: seats
-            });
-
-            if (!initResp || !initResp.success) {
-                alert("Booking Failed: " + (initResp ? initResp.message : "Unknown error"));
-                return;
-            }
-
-            if (confirm(`Total cost: ${initResp.total_cost}. Confirm payment?`)) {
-                const payResp = await apiFetch('/api/process_payment', {
-                    token: state.token, booking_id: initResp.booking_id, payment_mode: "Web"
-                });
-                alert(payResp.message);
-                document.getElementById('view-bookings-button').click(); // Refresh list
-            }
-        };
-
-        // View Bookings
-        document.getElementById('view-bookings-button').addEventListener('click', async () => {
-            const div = document.getElementById('bookings-list');
-            div.innerHTML = '<p class="loading">Loading...</p>';
-            const resp = await apiFetch('/api/my_bookings', { token: state.token });
-            
-            if (!resp || resp.length === 0) {
-                div.innerHTML = '<p>No bookings found.</p>';
-                return;
-            }
-
-            let html = '<table><tr><th>ID</th><th>Train</th><th>Date</th><th>Status</th><th>Action</th></tr>';
-            resp.forEach(b => {
-                let btn = b.status !== 'CANCELLED' ? `<button class="danger" onclick="cancelBooking('${b.booking_id}')">Cancel</button>` : 'Cancelled';
-                html += `<tr>
-                    <td>${b.booking_id.substring(0,8)}...</td>
-                    <td>${b.train_name}</td>
-                    <td>${b.datetime_of_departure}</td>
-                    <td>${b.status}</td>
-                    <td>${btn}</td>
-                </tr>`;
-            });
-            html += '</table>';
-            div.innerHTML = html;
-        });
-
-        // Cancel Function
-        window.cancelBooking = async function(bookingId) {
-            if (!confirm("Cancel this booking?")) return;
-            const resp = await apiFetch('/api/cancel_booking', { token: state.token, booking_id: bookingId });
-            alert(resp.message);
-            document.getElementById('view-bookings-button').click();
-        };
-
-        // Chatbot
-        document.getElementById('chat-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            const text = input.value;
-            if(!text) return;
-            
-            const msgs = document.getElementById('chat-messages');
-            msgs.innerHTML += `<div class="user">${text}</div>`;
-            input.value = '';
-
-            // Streaming Fetch
-            const botDiv = document.createElement('div');
-            botDiv.className = 'bot';
-            botDiv.innerText = '...';
-            msgs.appendChild(botDiv);
-
-            try {
-                const response = await fetch('/api/ask_bot', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ token: state.token, query: text })
-                });
-                
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let fullText = "";
-
-                while(true) {
-                    const {value, done} = await reader.read();
-                    if (done) break;
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-                    for(const line of lines) {
-                        if(line.startsWith('data: ')) {
-                            const dataStr = line.substring(6);
-                            if(dataStr.includes('[STREAM_END]')) break;
-                            try {
-                                const json = JSON.parse(dataStr);
-                                if(fullText === "") botDiv.innerText = "";
-                                fullText += json.answer;
-                                botDiv.innerText = fullText;
-                                msgs.scrollTop = msgs.scrollHeight;
-                            } catch(e) {}
-                        }
-                    }
-                }
-            } catch(e) {
-                botDiv.innerText = "Error connecting to bot.";
-            }
-        });
-
-        // --- ADMIN ACTIONS ---
+    <div id="customer-app" class="main-content hidden">
         
-        // Add Train
-        document.getElementById('add-train-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const resp = await apiFetch('/api/admin/add_train', {
-                token: state.token,
-                train_number: document.getElementById('admin-train-num').value,
-                train_name: document.getElementById('admin-train-name').value,
-                source_city_id: document.getElementById('admin-from-city').value,
-                destination_city_id: document.getElementById('admin-to-city').value,
-                train_type: document.getElementById('admin-train-type').value
-            });
-            document.getElementById('admin-message').textContent = resp.message;
-            if(resp.success) e.target.reset();
-        });
+        <div class="search-container">
+            <h3>Book Your Train Ticket</h3>
+            <form id="search-form" class="search-bar">
+                <div class="search-field">
+                    <label>FROM</label>
+                    <select id="search-from" required><option value="">Loading...</option></select>
+                    <i class="uil uil-location-point input-icon-s"></i>
+                </div>
+                <div class="exchange-icon"><i class="uil uil-exchange"></i></div>
+                <div class="search-field">
+                    <label>TO</label>
+                    <select id="search-to" required><option value="">Loading...</option></select>
+                    <i class="uil uil-map-marker input-icon-s"></i>
+                </div>
+                <div class="search-field">
+                    <label>DATE</label>
+                    <input type="date" id="search-date" required>
+                </div>
+                <button type="submit" class="search-btn">SEARCH TRAINS</button>
+            </form>
+        </div>
 
-        // Add Seat Class UI
-        document.getElementById('add-seat-class-btn').addEventListener('click', () => {
-            const div = document.createElement('div');
-            div.style = "display: flex; gap: 5px; margin-bottom: 5px;";
-            div.className = "seat-entry";
-            div.innerHTML = `
-                <select class="seat-type"><option value="AC1">AC1</option><option value="AC2">AC2</option><option value="AC3">AC3</option></select>
-                <input type="number" class="seat-count" placeholder="Seats">
-                <input type="number" class="seat-price" placeholder="Price">
-            `;
-            document.getElementById('seat-classes-container').appendChild(div);
-        });
+        <div id="search-results" class="results-container"></div>
 
-        // Add Service
-        document.getElementById('add-service-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const seats = [];
-            document.querySelectorAll('.seat-entry').forEach(div => {
-                seats.push({
-                    seat_type: div.querySelector('.seat-type').value,
-                    seats_available: div.querySelector('.seat-count').value,
-                    price: div.querySelector('.seat-price').value
-                });
-            });
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h4>My Bookings</h4>
+                    <button id="view-bookings-button" class="btn-text">Refresh</button>
+                </div>
+                <div id="bookings-list" class="card-body scrollable">
+                    <p class="placeholder-text">No bookings loaded.</p>
+                </div>
+            </div>
 
-            const resp = await apiFetch('/api/admin/add_service', {
-                token: state.token,
-                train_number: document.getElementById('admin-service-train-num').value,
-                datetime_of_departure: document.getElementById('admin-service-departure').value,
-                datetime_of_arrival: document.getElementById('admin-service-arrival').value,
-                seat_info: seats
-            });
-            document.getElementById('admin-message').textContent = resp.message;
-            if(resp.success) { e.target.reset(); document.getElementById('seat-classes-container').innerHTML = ''; }
-        });
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h4>AI Assistant</h4>
+                </div>
+                <div class="card-body chatbot-body">
+                    <div id="chat-messages">
+                        <div class="bot-msg">Hello! Ask me about trains or your bookings.</div>
+                    </div>
+                    <form id="chat-form" class="chat-input-area">
+                        <input type="text" id="chat-input" placeholder="Type a message..." required>
+                        <button type="submit"><i class="uil uil-message"></i></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // Admin View All
-        document.getElementById('admin-view-all-btn').addEventListener('click', async () => {
-            const div = document.getElementById('admin-trains-list');
-            div.innerHTML = "Loading...";
-            const resp = await apiFetch('/api/admin/view_trains', { token: state.token });
-            if(!resp || resp.length === 0) { div.innerHTML = "No trains."; return; }
+    <div id="admin-app" class="main-content hidden">
+        <div class="container">
+            <h2 class="mb-4">Admin Console</h2>
+            <p id="admin-message" class="admin-feedback"></p>
             
-            let html = "<table><tr><th>No.</th><th>Name</th><th>Type</th><th>From</th><th>To</th></tr>";
-            resp.forEach(t => {
-                html += `<tr><td>${t.number}</td><td>${t.name}</td><td>${t.type}</td><td>${t.source}</td><td>${t.destination}</td></tr>`;
-            });
-            div.innerHTML = html + "</table>";
-        });
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="admin-card">
+                        <h5>Add Train Route</h5>
+                        <form id="add-train-form">
+                            <input type="number" id="admin-train-num" class="form-style-light" placeholder="Train Number" required>
+                            <input type="text" id="admin-train-name" class="form-style-light" placeholder="Train Name" required>
+                            <select id="admin-from-city" class="form-style-light" required></select>
+                            <select id="admin-to-city" class="form-style-light" required></select>
+                            <select id="admin-train-type" class="form-style-light" required>
+                                <option value="Express">Express</option>
+                                <option value="Rajdhani">Rajdhani</option>
+                                <option value="Duronto">Duronto</option>
+                                <option value="Shatabdi">Shatabdi</option>
+                            </select>
+                            <button type="submit" class="btn-admin">Add Train</button>
+                        </form>
+                    </div>
+                </div>
 
-        // Init
-        checkLoginState();
+                <div class="col-md-6">
+                    <div class="admin-card">
+                        <h5>Add Service Schedule</h5>
+                        <form id="add-service-form">
+                            <input type="number" id="admin-service-train-num" class="form-style-light" placeholder="Train Number" required>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label style="font-size:12px; color:#666;">Departure Time</label>
+                                    <input type="datetime-local" id="admin-service-departure" class="form-style-light" required>
+                                </div>
+                                <div class="col-6">
+                                    <label style="font-size:12px; color:#666;">Arrival Time</label>
+                                    <input type="datetime-local" id="admin-service-arrival" class="form-style-light" required>
+                                </div>
+                            </div>
+                            
+                            <div id="seat-classes-container"></div>
+                            <button type="button" id="add-seat-class-btn" class="btn-text-dark" style="margin-bottom: 15px;">+ Add Seat Class</button>
+                            
+                            <button type="submit" class="btn-admin">Add Service</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
 
-    </script>
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="admin-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Train Routes</h5> </div>
+                        
+                        <form id="admin-view-trains-form" class="row mb-3">
+                            <div class="col-md-4">
+                                <select id="admin-filter-from" class="form-style-light">
+                                    <option value="">Filter Source...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <select id="admin-filter-to" class="form-style-light">
+                                    <option value="">Filter Destination...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex gap-2">
+                                <button type="submit" class="btn-admin" style="width: auto; padding: 0 20px;">Filter</button>
+                                <button type="button" id="admin-view-all-btn" class="btn-text-dark" style="background:#fff;">Show All</button>
+                            </div>
+                        </form>
+
+                        <div id="admin-trains-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
 </body>
 </html>
