@@ -15,7 +15,7 @@ All booking operations use a **Raft-based replication layer** to guarantee:
 * Strong consistency
 * Log replication across nodes
 * Leader-based command execution
-* Fault tolerance (nodes can fail & recover)
+* Fault tolerance
 
 ### ✔ Fully Asynchronous
 
@@ -25,21 +25,16 @@ All database operations use **`aiosqlite`**, allowing:
 * Concurrency-safe transactions
 * WAL-based high-performance writes
 
-### ✔ Real Features
+### ✔ Features
 
 The system provides:
 
 * **User Registration & Login**
 * **Session Management**
 * **Train & Service Management**
-* **Seat Booking (transactional)**
-* **Payment Confirmation**
+* **Seat Booking**
+* **Local LLM Chatbot for answering the Customer questions**
 * **Full Raft replication across 3 nodes**
-
-### ✔ Multiple Interfaces
-
-* **Flask Web App** (simple frontend)
-* **Distributed gRPC backend** (3-node cluster)
 
 ---
 
