@@ -19,7 +19,6 @@ async def create_user(username, hashed_password):
         await conn.commit()
         return True
     except aiosqlite.IntegrityError:
-        # This error occurs if the username is already taken
         await conn.rollback()
         return False
     except Exception as e:
@@ -51,7 +50,7 @@ async def create_session(user_id, token, expires_at):
         )
         await conn.commit()
     except aiosqlite.IntegrityError:
-        await conn.rollback()  # duplicate token, must rollback
+        await conn.rollback()  
         print(f"Duplicate session token detected.")
         return False
     except Exception as e:
@@ -184,8 +183,6 @@ async def initiate_booking_tx(user_id, service_id, num_seats, booking_id, total_
     conn = await get_db_connection()
     try:
         await conn.execute("BEGIN TRANSACTION")
-
-        # 1. Check for available seats
         async with conn.execute("SELECT seats_available FROM TrainServices WHERE service_id = ?", (service_id,)) as cursor:
             service = await cursor.fetchone()
 
@@ -197,11 +194,9 @@ async def initiate_booking_tx(user_id, service_id, num_seats, booking_id, total_
             await conn.rollback()
             return False, "Not enough seats available.", None, None
 
-        # 2. Update seat count
         new_seat_count = service['seats_available'] - num_seats
         await conn.execute("UPDATE TrainServices SET seats_available = ? WHERE service_id = ?", (new_seat_count, service_id))
 
-        # 3. Create booking record (using the ID and Cost from the leader)
         await conn.execute("""
             INSERT OR IGNORE INTO Bookings (booking_id, user_id, service_id, number_of_seats, total_cost, status)
             VALUES (?, ?, ?, ?, ?, 'PENDING')
@@ -240,13 +235,12 @@ async def confirm_payment_tx(booking_id, payment_mode, payment_id, transaction_i
             await conn.rollback()
             return False, f"Booking is in '{booking['status']}' state."
         
-        # Insert payment record using IDs from leader
         await conn.execute("""
             INSERT OR IGNORE INTO Payments (payment_id, booking_id, amount, payment_mode, payment_status, transaction_id)
             VALUES (?, ?, ?, ?, 'SUCCESS', ?)
         """, (payment_id, booking_id, booking['total_cost'], payment_mode, transaction_id))
         
-        # Update booking status
+
         await conn.execute("UPDATE Bookings SET status = 'CONFIRMED' WHERE booking_id = ?", (booking_id,))
 
         await conn.commit()
@@ -295,8 +289,6 @@ async def get_all_train_services_for_context():
     """
     conn = await get_db_connection()
     try:
-        # We only select trains departing from 'now' onwards to keep context relevant
-        # Using SQLite's 'datetime' function for comparison
         async with conn.execute("""
             SELECT
                 t.train_name,
@@ -328,7 +320,7 @@ async def get_service_price(service_id):
     try:
         async with conn.execute("SELECT price, seats_available FROM TrainServices WHERE service_id = ?", (service_id,)) as cursor:
             row = await cursor.fetchone()
-            return row # Returns None if not found, or a Row object
+            return row 
     finally:
         await conn.close()
         
@@ -341,7 +333,6 @@ async def get_trains_admin(source_id=0, dest_id=0):
     """
     conn = await get_db_connection()
     try:
-        # Base query
         sql = """
             SELECT 
                 t.train_number, t.train_name, t.train_type,
@@ -353,8 +344,6 @@ async def get_trains_admin(source_id=0, dest_id=0):
             WHERE 1=1
         """
         params = []
-        
-        # Add filters dynamically
         if source_id > 0:
             sql += " AND t.source_city_id = ?"
             params.append(source_id)
@@ -378,8 +367,6 @@ async def cancel_booking_tx(booking_id, user_id):
     conn = await get_db_connection()
     try:
         await conn.execute("BEGIN TRANSACTION")
-
-        # 1. Get booking details to find service_id and seat count
         async with conn.execute(
             "SELECT service_id, number_of_seats, status FROM Bookings WHERE booking_id = ? AND user_id = ?", 
             (booking_id, user_id)
@@ -389,17 +376,10 @@ async def cancel_booking_tx(booking_id, user_id):
         if not booking:
             await conn.rollback()
             return False, "Booking not found or does not belong to you."
-
-        # 2. Idempotency Check: If already cancelled, do nothing but return success
         if booking['status'] == 'CANCELLED':
             await conn.rollback()
             return True, "Booking was already cancelled."
-
-        # 3. Update Booking Status
         await conn.execute("UPDATE Bookings SET status = 'CANCELLED' WHERE booking_id = ?", (booking_id,))
-
-        # 4. Refund Seats (Increase available seats)
-        # We perform a read-modify-write on the TrainServices table
         async with conn.execute("SELECT seats_available FROM TrainServices WHERE service_id = ?", (booking['service_id'],)) as cursor:
             service = await cursor.fetchone()
         
