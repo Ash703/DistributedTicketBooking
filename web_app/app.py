@@ -3,7 +3,6 @@ import sys
 import os
 import json
 
-# Add the project root to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import train_booking_pb2
@@ -12,23 +11,16 @@ from grpc_client import call_with_leader_redirect, call_streaming_rpc
 
 app = Flask(__name__)
 
-# Helper to convert gRPC SeatType enum (int) to a string
 SEAT_TYPE_MAP = {
     0: 'UNKNOWN', 1: 'AC1', 2: 'AC2', 3: 'AC3', 4: 'GENERAL',
 }
 
-# --- HTML Page Routes ---
 
 @app.route('/')
 def home():
     """Serves the main HTML page."""
     return render_template('index.html')
 
-# --- ================== ---
-# --- API: UNARY CALLS ---
-# --- ================== ---
-# (Keep all your existing routes: /api/login, /api/register, /api/cities, etc.)
-# ...
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -38,8 +30,6 @@ def api_login():
         password=data.get('password')
     )
     grpc_response = call_with_leader_redirect("Login", grpc_request)
-    
-    # We'll guess the role based on username for the UI
     role = "ADMIN" if "admin" in data.get('username', '').lower() else "CUSTOMER"
     
     return jsonify({
@@ -134,9 +124,6 @@ def api_get_my_bookings():
     return jsonify(bookings_list)
 
 
-# --- ================== ---
-# --- API: ADMIN CALLS ---
-# --- ================== ---
 
 @app.route('/api/admin/add_train', methods=['POST'])
 def api_add_train():
@@ -158,12 +145,10 @@ def api_add_train():
 def api_add_service():
     data = request.json
     print(f"API: Admin request to add service for train {data.get('train_number')}")
-
-    # Convert seat_info from JSON list to gRPC repeated message
     seat_info_list = []
     for info in data.get('seat_info', []):
         seat_info_list.append(train_booking_pb2.SeatInfo(
-            seat_type=train_booking_pb2.SeatType.Value(info.get('seat_type')), # "AC2" -> 2
+            seat_type=train_booking_pb2.SeatType.Value(info.get('seat_type')), 
             seats_available=int(info.get('seats_available')),
             price=float(info.get('price'))
         ))
@@ -179,10 +164,6 @@ def api_add_service():
     return jsonify({"success": grpc_response.success, "message": grpc_response.message})
 
 
-# --- ====================== ---
-# --- API: STREAMING CALLS ---
-# --- ====================== ---
-
 @app.route('/api/ask_bot', methods=['POST'])
 def api_ask_bot():
     """
@@ -195,15 +176,13 @@ def api_ask_bot():
         query=data.get('query')
     )
     
-    # This generator function will stream data to the browser
     def stream_response_generator():
         for chunk in call_streaming_rpc("AskBot", grpc_request):
             data_payload = json.dumps({"answer": chunk.answer})
             yield f"data: {data_payload}\n\n"
-        # Signal the end of the stream
         yield "data: [STREAM_END]\n\n"
 
-    # Return a streaming response
+
     return Response(stream_response_generator(), mimetype='text/event-stream')
 
 @app.route('/api/cancel_booking', methods=['POST'])
@@ -220,7 +199,6 @@ def api_cancel_booking():
 def api_admin_view_trains():
     data = request.json
     
-    # If 'source_id' is missing or empty string, treat as 0 (no filter)
     src_id = int(data.get('source_city_id') or 0)
     dst_id = int(data.get('destination_city_id') or 0)
 
@@ -230,7 +208,6 @@ def api_admin_view_trains():
         destination_city_id=dst_id
     )
     
-    # Use the redirect client (even for reads, it's safer to hit a known node)
     grpc_response = call_with_leader_redirect("GetAllTrains", grpc_request)
     
     trains_list = [{

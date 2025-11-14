@@ -16,7 +16,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         self.raft = raft_node
         try:
             self.client = OpenAI(
-            base_url="http://127.0.0.1:54922",  #local llm url
+            base_url="http://127.0.0.1:54922",  #Local LLM model URL, needs to be updated depending on the current port number
             api_key="not-needed"
             )
         except:
@@ -62,8 +62,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                 success=False,
                 message=f"This node is not the leader. Please contact leader {leader}."
             )
-
-        # READ operations are fine to keep here
         user = await db_models.get_user_by_username(request.username)
         
         if not user:
@@ -75,10 +73,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         token = security_utils.generate_token()
         expires_at = time.time() + config.SESSION_DURATION_SECONDS
         
-        # --- REMOVED DIRECT WRITE ---
-        # await db_models.create_session(user['user_id'], token, expires_at)
-        # ----------------------------
-
         command_data = {
             "action": "CREATE_SESSION",
             "user_id": user['user_id'],
@@ -108,11 +102,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         admin_user = await db_models.get_user_by_token(request.admin_token)
         if not admin_user or admin_user['role'] != 'ADMIN':
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
-        
-        # --- REMOVED DIRECT WRITE ---
-        # success = await db_models.add_train(...)
-        # if not success: ...
-        # ----------------------------
         
         command_data = {
             "action": "ADD_TRAIN",
@@ -229,8 +218,8 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             "user_id": user['user_id'],
             "service_id": request.service_id,
             "number_of_seats": request.number_of_seats,
-            "booking_id": booking_id, # We dictate the ID
-            "total_cost": total_cost  # We dictate the Cost
+            "booking_id": booking_id, 
+            "total_cost": total_cost  
         }
         command = json.dumps(command_data)
         
@@ -317,16 +306,11 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
     
     async def GetAllTrains(self, request, context):
         print(f"Admin Request: List trains (Source: {request.source_city_id}, Dest: {request.destination_city_id})")
-
-        # 1. Authenticate Admin (This is a READ operation, so we can do it on any node)
         user = await db_models.get_user_by_token(request.admin_token)
         if not user or user['role'] != 'ADMIN':
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details("Unauthorized: Admin access required.")
             return train_booking_pb2.GetAllTrainsResponse()
-
-        # 2. Fetch Data from the local database
-        # (We assume get_trains_admin was added to database/models.py)
         try:
             trains_db = await db_models.get_trains_admin(request.source_city_id, request.destination_city_id)
         except Exception as e:
@@ -334,8 +318,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Database error: {e}")
             return train_booking_pb2.GetAllTrainsResponse()
-
-        # 3. Build the gRPC Response
         response = train_booking_pb2.GetAllTrainsResponse()
         for row in trains_db:
             t = response.trains.add()
@@ -351,7 +333,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
     async def CancelBooking(self, request, context):
         print(f"Request to cancel booking: {request.booking_id}")
 
-        # 1. Check Leader
         if self.raft.state != "leader":
             leader = self.raft.leader_id or "unknown"
             return train_booking_pb2.StatusResponse(
@@ -359,20 +340,17 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                 message=f"This node is not the leader. Please contact leader {leader}."
             )
 
-        # 2. Authenticate User
         user = await db_models.get_user_by_token(request.customer_token)
         if not user:
             return train_booking_pb2.StatusResponse(success=False, message="Unauthorized")
 
-        # 3. Create JSON Command
         command_data = {
             "action": "CANCEL_BOOKING",
             "booking_id": request.booking_id,
-            "user_id": user['user_id'] # Pass user_id to ensure ownership verification in DB
+            "user_id": user['user_id'] 
         }
         command = json.dumps(command_data)
 
-        # 4. Replicate
         raft_success, raft_msg = await self.raft.handle_client_command(command)
 
         if not raft_success:
@@ -382,23 +360,15 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
     
     async def AskBot(self, request, context):
         print(f"Chatbot query: {request.query}")
-        
-        # 1. Authenticate (Must await!)
         user = await db_models.get_user_by_token(request.customer_token)
         if not user:
             context.set_code(grpc.StatusCode.UNAUTHENTICATED)
             context.set_details("Invalid or expired token.")
             yield train_booking_pb2.LLMAnswer(answer="Please log in.")
             return
-
-        # 2. Get User Context (Must await!)
         user_bookings = await db_models.get_bookings_by_user_id(user['user_id'])
-        
-        # 3. Get Train Catalog Context 
-        # This lets the bot answer questions about *available* trains too.
         all_trains = await db_models.get_all_train_services_for_context()
 
-        # Build Context String
         context_text = "USER BOOKINGS:\n"
         if not user_bookings:
             context_text += "The user currently has no confirmed bookings.\n"
@@ -418,7 +388,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
                     f"departs {t['datetime_of_departure']}. ({t['seat_type']}), ({t['price']}), ({t['seats_available']} seats left).\n"
                 )
 
-        # Build System Prompt
+        
         system_prompt = (
             f"You are a helpful train booking assistant for user named {user['username']}. Greet them at start of every message.\n"
             f"Each train has multiple different seating class, such as AC!, AC2, AC3 and General. Each train's all seating classes must be listed under it. For a given train on a given day, each of these seating class must be listed under that along with price and seat available for each class.\n"
@@ -426,10 +396,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             f"If the user asks about ANYTHING else (weather, politics, etc), politely refuse.\n\n"
             f"CONTEXT DATA:\n{context_text}"
         )
-
-        # 4. Call LLM and Stream
         try:
-            # Note: accessing self.client is synchronous, but that's okay for this setup.
             stream = self.client.chat.completions.create(
                 model="mistral",
                 messages=[
