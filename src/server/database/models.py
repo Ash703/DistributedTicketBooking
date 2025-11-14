@@ -151,7 +151,7 @@ async def add_train_service(train_number, dt_departure, dt_arrival, seat_info):
         services_to_add = []
         for info in seat_info:
             services_to_add.append((
-                str(uuid.uuid4()),
+                info['service_id'],
                 train_number,
                 dt_departure,
                 dt_arrival,
@@ -176,18 +176,17 @@ async def add_train_service(train_number, dt_departure, dt_arrival, seat_info):
         
 
 
-async def initiate_booking_tx(user_id, service_id, num_seats, booking_id=None):
+async def initiate_booking_tx(user_id, service_id, num_seats, booking_id, total_cost):
     """
-    Reserves seats and creates a 'PENDING' booking in a single transaction.
-    If booking_id is provided (from Raft leader), it uses that.
-    Returns (success, message, booking_id, total_cost).
+    Applies a booking transaction from the Raft log.
+    This is now idempotent (safe to re-run) using INSERT OR IGNORE.
     """
     conn = await get_db_connection()
     try:
         await conn.execute("BEGIN TRANSACTION")
 
         # 1. Check for available seats
-        async with conn.execute("SELECT seats_available, price FROM TrainServices WHERE service_id = ?", (service_id,)) as cursor:
+        async with conn.execute("SELECT seats_available FROM TrainServices WHERE service_id = ?", (service_id,)) as cursor:
             service = await cursor.fetchone()
 
         if not service:
@@ -198,19 +197,11 @@ async def initiate_booking_tx(user_id, service_id, num_seats, booking_id=None):
             await conn.rollback()
             return False, "Not enough seats available.", None, None
 
-        # 2. Calculate cost
-        total_cost = service['price'] * num_seats
-        
-        # 3. Update seat count
+        # 2. Update seat count
         new_seat_count = service['seats_available'] - num_seats
         await conn.execute("UPDATE TrainServices SET seats_available = ? WHERE service_id = ?", (new_seat_count, service_id))
 
-        # 4. Create booking record
-        # If booking_id is not provided (legacy/test), generate one.
-        if booking_id is None:
-            booking_id = str(uuid.uuid4())
-            
-        # Use INSERT OR IGNORE to handle Raft replay idempotency
+        # 3. Create booking record (using the ID and Cost from the leader)
         await conn.execute("""
             INSERT OR IGNORE INTO Bookings (booking_id, user_id, service_id, number_of_seats, total_cost, status)
             VALUES (?, ?, ?, ?, ?, 'PENDING')
@@ -224,17 +215,16 @@ async def initiate_booking_tx(user_id, service_id, num_seats, booking_id=None):
         return False, f"An error occurred: {e}", None, None
     finally:
         await conn.close()
-
-async def confirm_payment_tx(booking_id, payment_mode, payment_id=None):
+        
+async def confirm_payment_tx(booking_id, payment_mode, payment_id, transaction_id):
     """
     Confirms a booking by creating a payment record and updating the booking status.
-    If payment_id is provided (from Raft log), uses that.
+    Now accepts 4 arguments.
     """
     conn = await get_db_connection()
     try:
         await conn.execute("BEGIN TRANSACTION")
 
-        # Get booking details
         async with conn.execute("SELECT total_cost, status FROM Bookings WHERE booking_id = ?", (booking_id,)) as cursor:
             booking = await cursor.fetchone()
 
@@ -242,21 +232,15 @@ async def confirm_payment_tx(booking_id, payment_mode, payment_id=None):
             await conn.rollback()
             return False, "Booking ID not found."
         
-        # Idempotency check: if already confirmed, just return success
         if booking['status'] == 'CONFIRMED':
-             await conn.rollback()
+             await conn.commit()
              return True, "Booking already confirmed."
 
         if booking['status'] != 'PENDING':
             await conn.rollback()
             return False, f"Booking is in '{booking['status']}' state."
-
-        # Insert payment record
-        if payment_id is None:
-            payment_id = str(uuid.uuid4())
-            
-        transaction_id = f"txn_{uuid.uuid4()}"
         
+        # Insert payment record using IDs from leader
         await conn.execute("""
             INSERT OR IGNORE INTO Payments (payment_id, booking_id, amount, payment_mode, payment_status, transaction_id)
             VALUES (?, ?, ?, ?, 'SUCCESS', ?)

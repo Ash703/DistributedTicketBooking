@@ -37,13 +37,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             )
             
         hashed_password = security_utils.hash_password(request.password)
-        
-        # --- REMOVED DIRECT WRITE ---
-        # success = await db_models.create_user(request.username, hashed_password)
-        # if not success:
-        #     return train_booking_pb2.StatusResponse(success=False, message="Username already exists.")
-        # ----------------------------
-        
+
         command_data = {
             "action": "REGISTER",
             "username": request.username,
@@ -152,16 +146,12 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             )
 
         seat_info_list = [{
+            "service_id": str(uuid.uuid4()),
             'seat_type': train_booking_pb2.SeatType.Name(info.seat_type),
             'seats_available': info.seats_available,
             'price': info.price
         } for info in request.seat_info]
         
-        # --- REMOVED DIRECT WRITE ---
-        # success = await db_models.add_train_service(...)
-        # if not success: ...
-        # ----------------------------
-
         command_data = {
             "action": "ADD_SERVICE",
             "train_number": request.train_number,
@@ -179,7 +169,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         return train_booking_pb2.StatusResponse(success=True, message="Train services added successfully.")
     
     async def SearchTrainServices(self, request, context):
-        # READ operations are safe to call directly from DB
         print(f"Request to search for trains from city ID {request.source_city_id} to {request.destination_city_id} on {request.date}")
         
         try: 
@@ -226,9 +215,6 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         user = await db_models.get_user_by_token(request.customer_token)
         if not user or user['role'] != 'CUSTOMER':
             return train_booking_pb2.BookingConfirmation(success=False, message="Unauthorized")
-
-        # --- 1. READ ONLY CHECK ---
-        # We check availability and get price, but we DO NOT write to DB yet.
         service = await db_models.get_service_price(request.service_id)
         
         if not service:
@@ -236,13 +222,8 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         
         if service['seats_available'] < request.number_of_seats:
             return train_booking_pb2.BookingConfirmation(success=False, message="Not enough seats available.")
-
-        # --- 2. PREPARE DATA ---
-        # Generate ID and Cost here so it is deterministic for all Raft nodes
         booking_id = str(uuid.uuid4())
         total_cost = float(service['price']) * request.number_of_seats
-
-        # --- 3. SEND TO RAFT ---
         command_data = {
             "action": "BOOK_SEATS",
             "user_id": user['user_id'],
@@ -283,7 +264,9 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         command_data = {
             "action": "CONFIRM_PAYMENT",
             "booking_id": request.booking_id,
-            "payment_mode": request.payment_mode
+            "payment_mode": request.payment_mode,
+            "payment_id": str(uuid.uuid4()),
+            "transaction_id": f"txn_{uuid.uuid4()}"
         }
         command = json.dumps(command_data)
         
