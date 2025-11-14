@@ -16,7 +16,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         self.raft = raft_node
         try:
             self.client = OpenAI(
-            base_url="http://127.0.0.1:50390",  #local llm url
+            base_url="http://127.0.0.1:54922",  #local llm url
             api_key="not-needed"
             )
         except:
@@ -396,7 +396,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         
         # 3. Get Train Catalog Context 
         # This lets the bot answer questions about *available* trains too.
-        # all_trains = await db_models.get_all_train_services_for_context()
+        all_trains = await db_models.get_all_train_services_for_context()
 
         # Build Context String
         context_text = "USER BOOKINGS:\n"
@@ -406,21 +406,22 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
             for booking in user_bookings:
                 context_text += (
                     f"- Booking ID {booking['booking_id'][:8]} for '{booking['train_name']}' "
-                    f"from '{booking['source']}' to '{booking['destination']}' "
+                    f"from '{booking['source']}' to '{booking['destination']}'. No. of seats '{booking['number_of_seats']}' of seat type: {booking['seat_type']}. "
                     f"on {booking['datetime_of_departure']}. Status: {booking['status']}.\n"
                 )
         
         context_text += "\nAVAILABLE TRAIN CATALOG:\n"
-        # if all_trains:
-        #     for t in all_trains:
-        #         context_text += (
-        #             f"- Train '{t['train_name']}' from '{t['source']}' to '{t['destination']}' "
-        #             f"departs {t['datetime_of_departure']}. ({t['seats_available']} seats left).\n"
-        #         )
+        if all_trains:
+            for t in all_trains:
+                context_text += (
+                    f"- Train '{t['train_name']}' from '{t['source']}' to '{t['destination']}' "
+                    f"departs {t['datetime_of_departure']}. ({t['seat_type']}), ({t['price']}), ({t['seats_available']} seats left).\n"
+                )
 
         # Build System Prompt
         system_prompt = (
-            f"You are a helpful train booking assistant for user ID {user['user_id']}.\n"
+            f"You are a helpful train booking assistant for user named {user['username']}. Greet them at start of every message.\n"
+            f"Each train has multiple different seating class, such as AC!, AC2, AC3 and General. Each train's all seating classes must be listed under it. For a given train on a given day, each of these seating class must be listed under that along with price and seat available for each class.\n"
             f"You MUST ONLY answer questions related to train bookings or schedules based on the context below.\n"
             f"If the user asks about ANYTHING else (weather, politics, etc), politely refuse.\n\n"
             f"CONTEXT DATA:\n{context_text}"

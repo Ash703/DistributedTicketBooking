@@ -450,11 +450,11 @@ class RaftNode(train_booking_pb2_grpc.RaftServicer):
             
             async with self.db_lock:
                 if action == "REGISTER":
-                    success, msg = await db_models.create_user(
+                    msg = await db_models.create_user(
                         data["username"], 
                         data["hashed_password"].encode("utf-8")
                     )
-                    return msg
+                    return "User Registered"
                 
                 elif action == "CREATE_SESSION":
                     await db_models.create_session(

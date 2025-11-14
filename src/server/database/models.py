@@ -303,6 +303,7 @@ async def get_all_train_services_for_context():
                 ts.datetime_of_departure,
                 ts.seat_type,
                 ts.seats_available,
+                ts.price,
                 source_city.city_name as source,
                 dest_city.city_name as destination
             FROM TrainServices ts
