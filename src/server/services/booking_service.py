@@ -14,6 +14,14 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
 
     def __init__(self, raft_node):
         self.raft = raft_node
+        try:
+            self.client = OpenAI(
+            base_url="http://127.0.0.1:50390",  #local llm url
+            api_key="not-needed"
+            )
+        except:
+            print("ChatBot is not available.")
+            pass
 
     async def Register(self, request, context):
         print(f"Registration attempt for username: {request.username}")
