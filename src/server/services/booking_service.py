@@ -9,16 +9,29 @@ from database import models as db_models
 from utils import security as security_utils
 from utils import config
 from openai import OpenAI
+import os
+from dotenv import load_dotenv
 
 class BookingService(train_booking_pb2_grpc.TicketingServicer):
 
     def __init__(self, raft_node):
         self.raft = raft_node
+        # Local LLM model initialization
+        # try:
+        #     self.client = OpenAI(
+        #     base_url="http://127.0.0.1:54922",  #Local LLM model URL, needs to be updated depending on the current port number
+        #     api_key="not-needed"
+        #     )
+        # except:
+        #     print("ChatBot is not available.")
+        #     pass
+        # groq LLM initialization
         try:
+            load_dotenv()
             self.client = OpenAI(
-            base_url="http://127.0.0.1:54922",  #Local LLM model URL, needs to be updated depending on the current port number
-            api_key="not-needed"
-            )
+            base_url="https://api.groq.com/openai/v1",
+            api_key=os.getenv("GROQ_API_KEY")
+        )
         except:
             print("ChatBot is not available.")
             pass
@@ -398,7 +411,7 @@ class BookingService(train_booking_pb2_grpc.TicketingServicer):
         )
         try:
             stream = self.client.chat.completions.create(
-                model="mistral",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": request.query}
